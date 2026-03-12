@@ -1,0 +1,18 @@
+# Next.js
+.next/
+out/
+
+# node
+node_modules/
+
+# env
+.env
+
+# logs
+*.log
+
+# vscode
+.vscode/
+
+public/data/
+data/
