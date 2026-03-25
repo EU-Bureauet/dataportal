@@ -5,9 +5,10 @@ interface VisualisationCardProps {
   title: string;
   description: string;
   href: string;
+  subDescription?: string;
 }
 
-export function VisualisationCard({ title, description, href }: VisualisationCardProps) {
+export function VisualisationCard({ title, description, href, subDescription }: VisualisationCardProps) {
   return (
     <Link
       href={href}
@@ -21,9 +22,14 @@ export function VisualisationCard({ title, description, href }: VisualisationCar
           <h3 className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
             {title}
           </h3>
-          <p className="mt-1 text-sm text-gray-600 line-clamp-2">
+          <p className="mt-1 text-sm text-gray-600">
             {description}
           </p>
+          {subDescription && (
+            <p className="mt-2 text-xs text-gray-500 italic line-clamp-2">
+              {subDescription}
+            </p>
+          )}
           <span className="mt-3 inline-block text-sm font-medium text-blue-600 group-hover:underline">
             Se visualisering &rarr;
           </span>
