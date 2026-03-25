@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import Link from 'next/link';
 import { EUBureauetLogo } from './eu-bureauet-logo.tsx';
 
@@ -16,6 +16,11 @@ const navigationLinks = [
   { href: '/heatmap', label: 'Heatmap' },
   { href: '/winning-coalitions', label: 'Vindende koalitioner' },
   { href: '/national-party-disagreements', label: 'Partiuenigheder' },
+];
+
+const themeLinks = [
+  { href: '/tema/forsvar', label: 'Forsvar' },
+  { href: '/tema/klima', label: 'Klima' },
 ];
 
 export function NavigationHeader() {
@@ -70,16 +75,38 @@ export function NavigationHeader() {
             aria-hidden={!isMenuOpen}
           >
             <ul className="py-2">
-              {navigationLinks.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="block px-6 py-3 text-gray-800 hover:bg-gray-100 transition-colors border-l-4 border-transparent hover:border-blue-500 hover:text-blue-600"
-                    onClick={closeMenu}
-                  >
-                    {link.label}
-                  </Link>
-                </li>
+              {navigationLinks.map((link, index) => (
+                <Fragment key={link.href}>
+                  <li>
+                    <Link
+                      href={link.href}
+                      className="block px-6 py-3 text-gray-800 hover:bg-gray-100 transition-colors border-l-4 border-transparent hover:border-blue-500 hover:text-blue-600"
+                      onClick={closeMenu}
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                  {index === 0 && (
+                    <>
+                      <li>
+                        <span className="block px-6 py-2 text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                          Temaer
+                        </span>
+                      </li>
+                      {themeLinks.map((theme) => (
+                        <li key={theme.href}>
+                          <Link
+                            href={theme.href}
+                            className="block pl-10 pr-6 py-2 text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent hover:border-blue-500 hover:text-blue-600 text-sm"
+                            onClick={closeMenu}
+                          >
+                            {theme.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </>
+                  )}
+                </Fragment>
               ))}
             </ul>
           </nav>
