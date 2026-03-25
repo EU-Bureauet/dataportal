@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import useSWR from "swr";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { ArticleCard } from "./article-card";
 
 interface Article {
@@ -19,6 +21,7 @@ interface ArticleFilter {
 interface ThemeArticlesProps {
   filter: ArticleFilter;
   fallbackArticles: Article[];
+  initialVisible?: number;
 }
 
 const WP_API_URL = "/wp-json/wp/v2/posts?per_page=100&_embed";
@@ -78,7 +81,10 @@ function filterByTags(
 export function ThemeArticles({
   filter,
   fallbackArticles,
+  initialVisible = 3,
 }: ThemeArticlesProps) {
+  const [expanded, setExpanded] = useState(false);
+
   const { data: posts } = useSWR(WP_API_URL, fetchWPPosts, {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
@@ -94,9 +100,13 @@ export function ThemeArticles({
     );
   }
 
+  const hasMore = articles.length > initialVisible;
+  const visible = expanded ? articles : articles.slice(0, initialVisible);
+  const hiddenCount = articles.length - initialVisible;
+
   return (
     <div className="space-y-6">
-      {articles.map((article) => (
+      {visible.map((article) => (
         <ArticleCard
           key={article.id}
           title={article.title}
@@ -105,6 +115,27 @@ export function ThemeArticles({
           url={article.url}
         />
       ))}
+
+      {hasMore && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg
+                     text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100
+                     transition-colors cursor-pointer"
+        >
+          {expanded ? (
+            <>
+              <ChevronUp className="w-4 h-4" />
+              Vis færre artikler
+            </>
+          ) : (
+            <>
+              <ChevronDown className="w-4 h-4" />
+              Vis {hiddenCount} flere artikler
+            </>
+          )}
+        </button>
+      )}
     </div>
   );
 }

@@ -211,8 +211,8 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
             />
           </aside>
 
-          {/* Right column — Visualisations (70%) */}
-          <section className="w-full lg:w-[70%]">
+          {/* Right column — Visualisations (70%), sticky on desktop */}
+          <section className="w-full lg:w-[70%] lg:self-start lg:sticky lg:top-24">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Visualiseringer</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {theme.visualisations.map((vis) => (
