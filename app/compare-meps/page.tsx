@@ -19,6 +19,36 @@ interface MEPComparison {
   disagreements: Array<{ vote_id: string; entity1_vote: number | null; entity2_vote: number | null }>;
 }
 
+const COUNTRY_NAMES: { [key: string]: string } = {
+  "AUT": "Østrig",
+  "BEL": "Belgien",
+  "BGR": "Bulgarien",
+  "HRV": "Kroatien",
+  "CYP": "Cypern",
+  "CZE": "Tjekkiet",
+  "DNK": "Danmark",
+  "EST": "Estland",
+  "FIN": "Finland",
+  "FRA": "Frankrig",
+  "DEU": "Tyskland",
+  "GRC": "Grækenland",
+  "HUN": "Ungarn",
+  "IRL": "Irland",
+  "ITA": "Italien",
+  "LVA": "Letland",
+  "LTU": "Litauen",
+  "LUX": "Luxembourg",
+  "MLT": "Malta",
+  "NLD": "Holland",
+  "POL": "Polen",
+  "PRT": "Portugal",
+  "ROU": "Rumænien",
+  "SVK": "Slovakiet",
+  "SVN": "Slovenien",
+  "ESP": "Spanien",
+  "SWE": "Sverige"
+};
+
 function CompareMEPsPage() {
   const router = useRouter();
   const [mep1Id, setMep1Id] = useState<string>("");
@@ -40,38 +70,6 @@ function CompareMEPsPage() {
     `/${basePath}/data/meps_clean.json`,
     fetcher
   );
-
-  // Map country codes to full names
-  const COUNTRY_NAMES: { [key: string]: string } = {
-    'AUT': 'Østrig',
-    'BEL': 'Belgien',
-    'BGR': 'Bulgarien',
-    'HRV': 'Kroatien',
-    'CYP': 'Cypern',
-    'CZE': 'Tjekkiet',
-    'DNK': 'Danmark',
-    'EST': 'Estland',
-    'FIN': 'Finland',
-    'FRA': 'Frankrig',
-    'DEU': 'Tyskland',
-    'GRC': 'Grækenland',
-    'HUN': 'Ungarn',
-    'IRL': 'Irland',
-    'ITA': 'Italien',
-    'LVA': 'Letland',
-    'LTU': 'Litauen',
-    'LUX': 'Luxembourg',
-    'MLT': 'Malta',
-    'NLD': 'Nederlandene',
-    'POL': 'Polen',
-    'PRT': 'Portugal',
-    'ROU': 'Rumænien',
-    'SVK': 'Slovakiet',
-    'SVN': 'Slovenien',
-    'ESP': 'Spanien',
-    'SWE': 'Sverige',
-    'GBR': 'Storbritannien'
-  };
 
   // Helper function to extract country code from URL
   const getCountryCode = (countryCodeOrUrl: string): string => {

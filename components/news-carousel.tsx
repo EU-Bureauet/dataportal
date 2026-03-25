@@ -12,6 +12,91 @@ interface Article {
   image?: string;
 }
 
+function extractTag(xml: string, tagName: string): string {
+  const regex = new RegExp(`<${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)<\/${tagName}>`, 'i');
+  const match = xml.match(regex);
+  if (!match) return '';
+  
+  let content = match[1].trim();
+  
+  // Remove CDATA wrapper if present
+  content = content.replace(/^<!\[CDATA\[/, '').replace(/\]\]>$/, '');
+  
+  return content.trim();
+}
+
+function stripHTML(html: string): string {
+  return html.replace(/<[^>]*>/g, '').trim();
+}
+
+function decodeHTML(html: string): string {
+  const entities: { [key: string]: string } = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#039;': "'",
+    '&apos;': "'",
+    '&nbsp;': ' ',
+  };
+  
+  return html.replace(/&[#a-z0-9]+;/gi, (entity) => {
+    return entities[entity.toLowerCase()] || entity;
+  });
+}
+
+function parseRSS(xmlText: string): Article[] {
+  const articles: Article[] = [];
+  
+  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+  const items = xmlText.match(itemRegex);
+  
+  if (!items) return articles;
+
+  for (const item of items.slice(0, 6)) {
+    const title = extractTag(item, 'title');
+    const link = extractTag(item, 'link');
+    const description = extractTag(item, 'description');
+    const pubDate = extractTag(item, 'pubDate');
+    
+    let image = '';
+    const contentEncoded = extractTag(item, 'content:encoded');
+    if (contentEncoded) {
+      const featuredImgMatch = contentEncoded.match(/<img[^>]*class="[^"]*webfeedsFeaturedVisual[^"]*"[^>]*src="([^">]+)"/);
+      if (featuredImgMatch) {
+        image = featuredImgMatch[1];
+      } else {
+        const imgMatch = contentEncoded.match(/<img[^>]*src="([^">]+)"/);
+        if (imgMatch) {
+          image = imgMatch[1];
+        }
+      }
+    }
+    
+    if (!image) {
+      const mediaContent = extractTag(item, 'media:content');
+      if (mediaContent) {
+        const urlMatch = mediaContent.match(/url="([^"]+)"/);
+        if (urlMatch) {
+          image = urlMatch[1];
+        }
+      }
+    }
+
+    const cleanDescription = decodeHTML(stripHTML(description || ''));
+
+    articles.push({
+      title: decodeHTML(title || 'Ingen titel'),
+      link: link || '#',
+      description: cleanDescription,
+      pubDate: pubDate || new Date().toISOString(),
+      image: image || undefined
+    });
+  }
+
+  return articles;
+}
+
 export default function NewsCarousel() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,97 +128,6 @@ export default function NewsCarousel() {
 
     fetchRSS();
   }, []); // Empty dependency array - fetch only once on mount
-
-  function parseRSS(xmlText: string): Article[] {
-    const articles: Article[] = [];
-    
-    // Extract all <item> elements
-    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
-    const items = xmlText.match(itemRegex);
-    
-    if (!items) return articles;
-
-    for (const item of items.slice(0, 6)) {
-      const title = extractTag(item, 'title');
-      const link = extractTag(item, 'link');
-      const description = extractTag(item, 'description');
-      const pubDate = extractTag(item, 'pubDate');
-      
-      // Try to extract image from content:encoded or media:content
-      let image = '';
-      const contentEncoded = extractTag(item, 'content:encoded');
-      if (contentEncoded) {
-        // First try to find the featured image with webfeedsFeaturedVisual class
-        const featuredImgMatch = contentEncoded.match(/<img[^>]*class="[^"]*webfeedsFeaturedVisual[^"]*"[^>]*src="([^">]+)"/);
-        if (featuredImgMatch) {
-          image = featuredImgMatch[1];
-        } else {
-          // Fallback to any img tag
-          const imgMatch = contentEncoded.match(/<img[^>]*src="([^">]+)"/);
-          if (imgMatch) {
-            image = imgMatch[1];
-          }
-        }
-      }
-      
-      // Fallback to media:content if no image found
-      if (!image) {
-        const mediaContent = extractTag(item, 'media:content');
-        if (mediaContent) {
-          const urlMatch = mediaContent.match(/url="([^"]+)"/);
-          if (urlMatch) {
-            image = urlMatch[1];
-          }
-        }
-      }
-
-      // Clean description: strip HTML tags and decode HTML entities
-      const cleanDescription = decodeHTML(stripHTML(description || ''));
-
-      articles.push({
-        title: decodeHTML(title || 'Ingen titel'),
-        link: link || '#',
-        description: cleanDescription,
-        pubDate: pubDate || new Date().toISOString(),
-        image: image || undefined
-      });
-    }
-
-    return articles;
-  }
-
-  function extractTag(xml: string, tagName: string): string {
-    const regex = new RegExp(`<${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)<\/${tagName}>`, 'i');
-    const match = xml.match(regex);
-    if (!match) return '';
-    
-    let content = match[1].trim();
-    
-    // Remove CDATA wrapper if present
-    content = content.replace(/^<!\[CDATA\[/, '').replace(/\]\]>$/, '');
-    
-    return content.trim();
-  }
-
-  function stripHTML(html: string): string {
-    return html.replace(/<[^>]*>/g, '').trim();
-  }
-
-  function decodeHTML(html: string): string {
-    const entities: { [key: string]: string } = {
-      '&amp;': '&',
-      '&lt;': '<',
-      '&gt;': '>',
-      '&quot;': '"',
-      '&#039;': "'",
-      '&apos;': "'",
-      '&nbsp;': ' ',
-    };
-    
-    return html.replace(/&[#a-z0-9]+;/gi, (entity) => {
-      return entities[entity.toLowerCase()] || entity;
-    });
-  }
 
   const nextSlide = () => {
     setCurrentIndex((prevIndex) => 

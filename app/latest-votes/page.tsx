@@ -1,7 +1,8 @@
 "use client"
 
-import React, { useMemo, useState } from "react";
+import React, { Suspense, useMemo, useState, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { ChevronDown } from "lucide-react";
 
@@ -91,7 +92,23 @@ const sortVotesByNewest = (votes: Vote[]): Vote[] => {
 const ITEMS_PER_PAGE = 25;
 
 export default function LatestVotesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-6xl mx-auto px-6 py-12">
+          <h1 className="text-3xl font-bold mb-4">Seneste afstemninger</h1>
+          <p className="text-gray-600">Indlæser data...</p>
+        </div>
+      </div>
+    }>
+      <LatestVotesContent />
+    </Suspense>
+  );
+}
+
+function LatestVotesContent() {
   const basePath = process.env.NEXT_PUBLIC_BASEPATH || "dataportal";
+  const searchParams = useSearchParams();
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCommittee, setSelectedCommittee] = useState<string | null>(null);
@@ -99,6 +116,19 @@ export default function LatestVotesPage() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [committeeDisplayLimit, setCommitteeDisplayLimit] = useState(15);
   const [eurovocDisplayLimit, setEurovocDisplayLimit] = useState(15);
+
+  // Initialize filters from URL query params (e.g. ?search=forsvar&eurovoc=forsvarspolitik&committee=...)
+  const [initializedFromUrl, setInitializedFromUrl] = useState(false);
+  useEffect(() => {
+    if (initializedFromUrl) return;
+    const qSearch = searchParams.get("search");
+    const qEurovoc = searchParams.get("eurovoc");
+    const qCommittee = searchParams.get("committee");
+    if (qSearch) setSearchQuery(qSearch);
+    if (qEurovoc) setSelectedEurovoc(qEurovoc);
+    if (qCommittee) setSelectedCommittee(qCommittee);
+    setInitializedFromUrl(true);
+  }, [searchParams, initializedFromUrl]);
   const url = `/${basePath}/data/latest_votes.json`;
   const { data, error, isLoading } = useSWR<LatestVotesData>(url, fetcher);
 
@@ -110,21 +140,23 @@ export default function LatestVotesPage() {
     return new RegExp(escaped, "i");
   }, [normalizedQuery, hasActiveSearch]);
 
-  const matchesSearchQuery = (doc: Document): boolean => {
-    if (!searchRegex) return true;
-    const committeeNames = parseCommitteeNames(doc.committee);
-    const eurovocKeywords = doc.eurovoc_keywords || [];
-    const voteDescriptions = doc.votes.map((vote) => vote.vote_description);
-    const searchableFields = [
-      doc.report,
-      doc.short_title,
-      ...committeeNames,
-      ...eurovocKeywords,
-      ...voteDescriptions,
-    ];
+  const matchesSearchQuery = useMemo(() => {
+    return (doc: Document): boolean => {
+      if (!searchRegex) return true;
+      const committeeNames = parseCommitteeNames(doc.committee);
+      const eurovocKeywords = doc.eurovoc_keywords || [];
+      const voteDescriptions = doc.votes.map((vote) => vote.vote_description);
+      const searchableFields = [
+        doc.report,
+        doc.short_title,
+        ...committeeNames,
+        ...eurovocKeywords,
+        ...voteDescriptions,
+      ];
 
-    return searchableFields.some((value) => value && searchRegex.test(value));
-  };
+      return searchableFields.some((value) => value && searchRegex.test(value));
+    };
+  }, [searchRegex]);
 
   // Calculate committee counts based on current committee and eurovoc filters
   const allCommitteeCounts = useMemo(() => {
@@ -160,7 +192,7 @@ export default function LatestVotesPage() {
         count,
       }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  }, [data?.documents, selectedCommittee, selectedEurovoc, normalizedQuery]);
+  }, [data?.documents, selectedCommittee, selectedEurovoc, matchesSearchQuery]);
 
   const committeeCounts = useMemo(() => {
     return allCommitteeCounts.slice(0, committeeDisplayLimit);
@@ -200,7 +232,7 @@ export default function LatestVotesPage() {
     return Object.entries(counts)
       .map(([label, count]) => ({ label, count }))
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
-  }, [data?.documents, selectedCommittee, selectedEurovoc, normalizedQuery]);
+  }, [data?.documents, selectedCommittee, selectedEurovoc, matchesSearchQuery]);
 
   const eurovocCounts = useMemo(() => {
     return allEurovocCounts.slice(0, eurovocDisplayLimit);

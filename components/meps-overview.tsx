@@ -276,6 +276,7 @@ export function MEPsOverview({ data }: MEPsOverviewProps) {
                 >
                   <div className="flex items-start gap-3">
                     {/* Photo */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={mep.photo_url}
                       alt={mep.full_name}

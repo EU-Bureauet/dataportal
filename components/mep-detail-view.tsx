@@ -80,6 +80,7 @@ export function MEPDetailView({ mep }: MEPDetailViewProps) {
         <div className="flex flex-col md:flex-row gap-6">
           {/* Photo */}
           <div className="flex-shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={mep.photo_url}
               alt={mep.full_name}

@@ -1,5 +1,3 @@
-import { EUBureauetLogo } from './eu-bureauet-logo.tsx';
-
 export function Footer() {
   return (
     <footer className="bg-gradient-to-r from-blue-50 to-green-50 mt-auto">
