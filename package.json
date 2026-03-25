@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "prebuild": "node scripts/fetch-articles.mjs",
     "build": "next build",
-    "start": "next start",
+    "start": "npx serve out -l 3000",
     "lint": "next lint && tsc --noemit",
+    "fetch-articles": "node scripts/fetch-articles.mjs",
     "package": "next build && cd out && tar -cf ../build-$(date +%Y-%m-%d-%s).tar.gz *"
   },
   "dependencies": {

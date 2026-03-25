@@ -2,15 +2,24 @@ import fs from "fs";
 import path from "path";
 import { notFound } from "next/navigation";
 import { HeroSection } from "@/components/hero-section";
-import { ArticleCard } from "@/components/article-card";
+import { ThemeArticles } from "@/components/theme-articles";
 import { VisualisationCard } from "@/components/visualisation-card";
 import { ParliamentHemicycle } from "@/components/parliament-hemicycle";
 
 interface ThemeArticle {
+  id: string;
   title: string;
   description: string;
   image: string;
   url: string;
+  date: string;
+  categories: string[];
+  tags: string[];
+}
+
+interface ThemeArticleFilter {
+  tags: string[];
+  maxArticles?: number;
 }
 
 interface ThemeVisualisation {
@@ -29,7 +38,7 @@ interface ThemeData {
   slug: string;
   title: string;
   heroImage: string;
-  articles: ThemeArticle[];
+  articleFilter: ThemeArticleFilter;
   visualisations: ThemeVisualisation[];
 }
 
@@ -51,6 +60,21 @@ function getThemeData(slug: string): ThemeData | null {
   if (!fs.existsSync(filePath)) return null;
   const raw = fs.readFileSync(filePath, "utf-8");
   return JSON.parse(raw) as ThemeData;
+}
+
+function getThemeArticles(filter: ThemeArticleFilter): ThemeArticle[] {
+  const articlesPath = path.join(process.cwd(), "data", "articles.json");
+  if (!fs.existsSync(articlesPath)) return [];
+  const raw = fs.readFileSync(articlesPath, "utf-8");
+  const data = JSON.parse(raw) as { articles: ThemeArticle[] };
+
+  const filterTags = filter.tags.map((t) => t.toLowerCase());
+
+  return data.articles
+    .filter((a) =>
+      a.tags.some((tag) => filterTags.includes(tag.toLowerCase()))
+    )
+    .slice(0, filter.maxArticles ?? 6);
 }
 
 interface LatestVotesDoc {
@@ -168,6 +192,8 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
     notFound();
   }
 
+  const articles = getThemeArticles(theme.articleFilter);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       {/* Hero — full width, sits right below the sticky nav */}
@@ -179,17 +205,10 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
           {/* Left column — Articles (30%) */}
           <aside className="w-full lg:w-[30%] lg:border-r lg:border-gray-200 lg:pr-8">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Artikler</h2>
-            <div className="space-y-6">
-              {theme.articles.map((article) => (
-                <ArticleCard
-                  key={article.url}
-                  title={article.title}
-                  description={article.description}
-                  image={article.image}
-                  url={article.url}
-                />
-              ))}
-            </div>
+            <ThemeArticles
+              filter={theme.articleFilter}
+              fallbackArticles={articles}
+            />
           </aside>
 
           {/* Right column — Visualisations (70%) */}
