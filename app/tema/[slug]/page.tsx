@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { HeroSection } from "@/components/hero-section";
 import { ArticleCard } from "@/components/article-card";
 import { VisualisationCard } from "@/components/visualisation-card";
+import { ParliamentHemicycle } from "@/components/parliament-hemicycle";
 
 interface ThemeArticle {
   title: string;
@@ -204,6 +205,11 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
                   subDescription={generateSubDescription(vis)}
                 />
               ))}
+            </div>
+
+            {/* Parliament hemicycle — aligned with the visualisation cards */}
+            <div className="mt-8 bg-white rounded-xl shadow-md border border-gray-100 p-6 sm:p-8">
+              <ParliamentHemicycle />
             </div>
           </section>
         </div>
