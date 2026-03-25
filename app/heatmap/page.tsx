@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useState, useMemo } from 'react';
+import React, { Suspense, useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { HeatmapGrid } from "@/components/heatmap-grid";
 import { PairwiseCoalitionsData, type CommitteeAndGroupNames } from "@/types/data";
 import committeeNamesData from "@/data/committee_and_group_names.json";
@@ -10,7 +11,32 @@ import { Card } from "@/components/ui/card";
 import useSWR from "swr";
 
 export default function HeatmapPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-6 py-12">
+          <h1 className="text-3xl font-bold mb-4">Enighed mellem Politiske Grupper</h1>
+          <p className="text-gray-600">Indlæser data...</p>
+        </div>
+      </div>
+    }>
+      <HeatmapContent />
+    </Suspense>
+  );
+}
+
+function HeatmapContent() {
+  const searchParams = useSearchParams();
   const [selectedCommittee, setSelectedCommittee] = useState<string>('TOTAL');
+
+  // Initialize committee filter from URL query param (e.g. ?committee=SEDE)
+  const [initializedFromUrl, setInitializedFromUrl] = useState(false);
+  useEffect(() => {
+    if (initializedFromUrl) return;
+    const qCommittee = searchParams.get("committee");
+    if (qCommittee) setSelectedCommittee(qCommittee);
+    setInitializedFromUrl(true);
+  }, [searchParams, initializedFromUrl]);
 
   const fetcher = (url: string) => {
     return fetch(url).then(response => {
