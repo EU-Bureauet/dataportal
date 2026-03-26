@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import useSWR from "swr";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
 
 // ─── Local photo helper ──────────────────────────────────────────────────────
 
@@ -92,6 +92,7 @@ interface MEPSummary {
   totalDisagreements: number;
   filteredDisagreements: Disagreement[];
   topAllies: AllyCount[];
+  topicVoteCount: number;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -111,6 +112,57 @@ const GROUP_COLORS: Record<string, string> = {
 };
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+// ─── Group tooltip badge ─────────────────────────────────────────────────────
+
+function GroupBadge({
+  code,
+  description,
+  pill,
+  children,
+}: Readonly<{
+  code: string;
+  description?: string;
+  pill?: boolean;
+  children?: React.ReactNode;
+}>) {
+  const bg = GROUP_COLORS[code] ?? "#888";
+
+  if (pill) {
+    return (
+      <span className="relative group/tip inline-flex">
+        <span
+          className="text-xs px-1.5 py-0.5 rounded font-medium text-white cursor-default"
+          style={{ backgroundColor: bg }}
+        >
+          {children ?? code}
+        </span>
+        {description && (
+          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 px-3 py-2 rounded-lg bg-white text-gray-800 border border-gray-200 text-xs leading-snug shadow-md opacity-0 pointer-events-none group-hover/tip:opacity-100 group-hover/tip:pointer-events-auto transition-opacity duration-150 z-50 text-center">
+            <span className="font-semibold text-gray-900">{code}</span>: {description}
+          </span>
+        )}
+      </span>
+    );
+  }
+
+  // Inline text variant (used in AllyBar)
+  return (
+    <span className="relative group/tip inline-flex">
+      <span
+        className="text-xs w-20 text-right truncate font-medium cursor-default"
+        style={{ color: bg }}
+      >
+        {code}
+      </span>
+      {description && (
+        <span className="absolute bottom-full right-0 mb-2 w-56 px-3 py-2 rounded-lg bg-white text-gray-800 border border-gray-200 text-xs leading-snug shadow-md opacity-0 pointer-events-none group-hover/tip:opacity-100 group-hover/tip:pointer-events-auto transition-opacity duration-150 z-50">
+          <span className="font-semibold text-gray-900">{code}</span>: {description}
+        </span>
+      )}
+    </span>
+  );
+}
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
@@ -144,7 +196,7 @@ function LoyaltyBar({ loyalty, against, total }: { loyalty: number; against: num
   );
 }
 
-function AllyBar({ allies, mepGroup }: { allies: AllyCount[]; mepGroup: string }) {
+function AllyBar({ allies, mepGroup, groupDescriptions }: { allies: AllyCount[]; mepGroup: string; groupDescriptions: Record<string, string> }) {
   if (allies.length === 0) return <p className="text-xs text-gray-400 italic">Ingen data</p>;
   const max = allies[0].count;
 
@@ -153,9 +205,7 @@ function AllyBar({ allies, mepGroup }: { allies: AllyCount[]; mepGroup: string }
       <p className="text-xs font-medium text-gray-500 mb-2">Stemmer oftest med (ved brud):</p>
       {allies.map((a) => (
         <div key={a.group} className="flex items-center gap-2">
-          <span className="text-xs w-20 text-right truncate font-medium" style={{ color: GROUP_COLORS[a.group] ?? "#666" }}>
-            {a.group}
-          </span>
+          <GroupBadge code={a.group} description={groupDescriptions[a.group]} />
           <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-500"
@@ -175,7 +225,7 @@ function AllyBar({ allies, mepGroup }: { allies: AllyCount[]; mepGroup: string }
   );
 }
 
-function VoteRow({ d, groupCodes }: { d: Disagreement; groupCodes: readonly string[] }) {
+function VoteRow({ d, groupCodes, groupDescriptions }: { d: Disagreement; groupCodes: readonly string[]; groupDescriptions: Record<string, string> }) {
   const mepVote = d["Vote Type"];
   const groupVote = d["Vote Type_Majority"];
   const voteLabel = (v: string) => v === "For" ? "For" : v === "Against" ? "Imod" : "Blank";
@@ -219,13 +269,7 @@ function VoteRow({ d, groupCodes }: { d: Disagreement; groupCodes: readonly stri
         <div className="mt-2 flex flex-wrap gap-1">
           <span className="text-xs text-gray-400">Stemte ligesom MEP&apos;en:</span>
           {sameAsMe.map((gc) => (
-            <span
-              key={gc}
-              className="text-xs px-1.5 py-0.5 rounded font-medium text-white"
-              style={{ backgroundColor: GROUP_COLORS[gc] ?? "#888" }}
-            >
-              {gc}
-            </span>
+            <GroupBadge key={gc} code={gc} description={groupDescriptions[gc]} pill />
           ))}
         </div>
       )}
@@ -239,10 +283,12 @@ function MEPDetailPanel({
   summary,
   onClose,
   basePath,
+  groupDescriptions,
 }: {
   summary: MEPSummary;
   onClose: () => void;
   basePath: string;
+  groupDescriptions: Record<string, string>;
 }) {
   const [showAll, setShowAll] = useState(false);
   const list = summary.filteredDisagreements;
@@ -282,7 +328,7 @@ function MEPDetailPanel({
       {/* Ally chart */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg">
         <h4 className="text-sm font-semibold text-gray-700 mb-3">Hvem stemmer {summary.mep.family_name} med ved brud?</h4>
-        <AllyBar allies={summary.topAllies} mepGroup={summary.mep.current_group_id.code} />
+        <AllyBar allies={summary.topAllies} mepGroup={summary.mep.current_group_id.code} groupDescriptions={groupDescriptions} />
       </div>
 
       {/* Vote list */}
@@ -290,7 +336,7 @@ function MEPDetailPanel({
         <h4 className="text-sm font-semibold text-gray-700 mb-3">Afstemninger hvor {summary.mep.family_name} brød med {summary.mep.current_group_id.code}</h4>
         <div className="divide-y divide-gray-100">
           {visible.map((d) => (
-            <VoteRow key={`${d["Vote ID"]}-${d["Vote Description"]}`} d={d} groupCodes={GROUP_CODES} />
+            <VoteRow key={`${d["Vote ID"]}-${d["Vote Description"]}`} d={d} groupCodes={GROUP_CODES} groupDescriptions={groupDescriptions} />
           ))}
         </div>
         {list.length > 8 && (
@@ -328,8 +374,22 @@ export function DanishMEPVotesChart() {
     `${basePath}/data/latest_votes.json`,
     fetcher
   );
+  const { data: tooltipData } = useSWR<{ groups: { code: string; description: string }[] }>(
+    `${basePath}/data/group-tooltips.json`,
+    fetcher
+  );
+
+  // Build group code → description map
+  const groupDescriptions = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (tooltipData) {
+      for (const g of tooltipData.groups) map[g.code] = g.description;
+    }
+    return map;
+  }, [tooltipData]);
 
   const [selectedMEP, setSelectedMEP] = useState<string | null>(null);
+  const [expandedMEP, setExpandedMEP] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"name" | "participation" | "breaks">("breaks");
 
   // Build a map of vote_id → eurovoc keywords for topic filtering
@@ -343,6 +403,25 @@ export function DanishMEPVotesChart() {
     }
     return map;
   }, [latestVotes]);
+
+  // Count total topic-relevant vote IDs (used for per-topic loyalty)
+  const topicVoteIds = useMemo(() => {
+    if (!voteTopicMap || (!searchFilter && !eurovocFilter)) return null;
+    const ids = new Set<string>();
+    for (const [vid, keywords] of voteTopicMap.entries()) {
+      if (eurovocFilter && keywords.some((kw) => kw.toLowerCase() === eurovocFilter.toLowerCase())) {
+        ids.add(vid);
+        continue;
+      }
+      if (searchFilter) {
+        const re = new RegExp(searchFilter.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+        if (keywords.some((kw) => re.test(kw))) {
+          ids.add(vid);
+        }
+      }
+    }
+    return ids;
+  }, [voteTopicMap, searchFilter, eurovocFilter]);
 
   // Build MEP summaries
   const summaries = useMemo((): MEPSummary[] => {
@@ -362,7 +441,7 @@ export function DanishMEPVotesChart() {
           if (!keywords) return false;
           if (eurovocFilter && keywords.some((kw) => kw.toLowerCase() === eurovocFilter.toLowerCase())) return true;
           if (searchFilter) {
-            const re = new RegExp(searchFilter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+            const re = new RegExp(searchFilter.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
             const fields = [d["Short Title"], d["Document Title"], ...keywords];
             return fields.some((f) => re.test(f));
           }
@@ -396,9 +475,10 @@ export function DanishMEPVotesChart() {
         totalDisagreements: mepDisag.length,
         filteredDisagreements: filtered,
         topAllies,
+        topicVoteCount: topicVoteIds ? topicVoteIds.size : 0,
       };
     });
-  }, [mepData, brudData, voteTopicMap, searchFilter, eurovocFilter]);
+  }, [mepData, brudData, voteTopicMap, searchFilter, eurovocFilter, topicVoteIds]);
 
   // Sort
   const sorted = useMemo(() => {
@@ -418,6 +498,7 @@ export function DanishMEPVotesChart() {
 
   const handleSelect = useCallback((mepId: string) => setSelectedMEP(mepId), []);
   const handleClose = useCallback(() => setSelectedMEP(null), []);
+  const toggleAccordion = useCallback((mepId: string) => setExpandedMEP((prev) => (prev === mepId ? null : mepId)), []);
 
   // ─── Loading state ─────────────────────────────────────────────────────────
 
@@ -432,7 +513,7 @@ export function DanishMEPVotesChart() {
   // ─── Detail view ───────────────────────────────────────────────────────────
 
   if (selectedSummary) {
-    return <MEPDetailPanel summary={selectedSummary} onClose={handleClose} basePath={basePath} />;
+    return <MEPDetailPanel summary={selectedSummary} onClose={handleClose} basePath={basePath} groupDescriptions={groupDescriptions} />;
   }
 
   // ─── Overview ──────────────────────────────────────────────────────────────
@@ -471,78 +552,106 @@ export function DanishMEPVotesChart() {
       <div className="space-y-4">
         {sorted.map((s) => {
           const filteredCount = s.filteredDisagreements.length;
-          const noResults = hasTopicFilter && filteredCount === 0;
+          const isExpanded = expandedMEP === s.mep.mep_id;
+
+          // Build detail link with current filters preserved
+          const detailParams = new URLSearchParams();
+          detailParams.set("mep", s.mep.mep_id);
+          if (searchFilter) detailParams.set("search", searchFilter);
+          if (eurovocFilter) detailParams.set("eurovoc", eurovocFilter);
+          const detailHref = `${basePath}/danish-mep-votes?${detailParams.toString()}`;
 
           return (
-            <button
+            <div
               key={s.mep.mep_id}
-              onClick={() => !noResults && handleSelect(s.mep.mep_id)}
-              disabled={noResults}
-              className={`w-full text-left bg-white rounded-xl border p-4 transition-all ${
-                noResults
-                  ? "opacity-50 border-gray-100 cursor-default"
-                  : "border-gray-200 hover:border-blue-300 hover:shadow-md cursor-pointer"
+              className={`bg-white rounded-xl border transition-all ${
+                isExpanded
+                  ? "border-blue-300 shadow-md"
+                  : "border-gray-200 hover:border-blue-300 hover:shadow-md"
               }`}
             >
-              <div className="flex items-start gap-4">
-                {/* Photo */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={toLocalPhotoUrl(s.mep.full_name, basePath)}
-                  alt={s.mep.full_name}
-                  className="w-12 h-12 rounded-full object-cover border border-gray-200 flex-shrink-0"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50" y="50" text-anchor="middle" dy=".3em" font-size="40"%3E?%3C/text%3E%3C/svg%3E';
-                  }}
-                />
+              {/* Clickable header */}
+              <button
+                onClick={() => toggleAccordion(s.mep.mep_id)}
+                className="w-full text-left p-4 cursor-pointer"
+              >
+                <div className="flex items-start gap-4">
+                  {/* Photo */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={toLocalPhotoUrl(s.mep.full_name, basePath)}
+                    alt={s.mep.full_name}
+                    className="w-12 h-12 rounded-full object-cover border border-gray-200 flex-shrink-0"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50" y="50" text-anchor="middle" dy=".3em" font-size="40"%3E?%3C/text%3E%3C/svg%3E';
+                    }}
+                  />
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <h3 className="font-semibold text-gray-900">{s.mep.full_name}</h3>
-                    <span
-                      className="text-xs px-2 py-0.5 rounded-full font-medium text-white flex-shrink-0"
-                      style={{ backgroundColor: GROUP_COLORS[s.mep.current_group_id.code] ?? "#888" }}
-                    >
-                      {s.mep.current_group_id.code}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    {s.mep.national_party_id.name} ({s.mep.national_party_id.code})
-                  </p>
-
-                  {/* Loyalty bar */}
-                  <div className="mt-3">
-                    <LoyaltyBar
-                      loyalty={s.mep.group_loyalty}
-                      against={hasTopicFilter ? filteredCount : s.mep.n_votes_against_group}
-                      total={hasTopicFilter ? (filteredCount + Math.round(filteredCount * (s.mep.group_loyalty / (100 - s.mep.group_loyalty + 0.01)))) : s.mep.n_votes}
-                    />
-                  </div>
-
-                  {/* Top 3 allies preview */}
-                  {filteredCount > 0 && s.topAllies.length > 0 && (
-                    <div className="mt-3 flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs text-gray-400">Allierede ved brud:</span>
-                      {s.topAllies.slice(0, 3).map((a) => (
-                        <span
-                          key={a.group}
-                          className="text-xs px-1.5 py-0.5 rounded font-medium text-white"
-                          style={{ backgroundColor: GROUP_COLORS[a.group] ?? "#888" }}
-                        >
-                          {a.group} ({a.count})
-                        </span>
-                      ))}
-                      <span className="text-xs text-blue-600">→ Se detaljer</span>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-baseline gap-2 min-w-0">
+                        <h3 className="font-semibold text-gray-900">{s.mep.full_name}</h3>
+                        <GroupBadge code={s.mep.current_group_id.code} description={groupDescriptions[s.mep.current_group_id.code]} pill>
+                          {s.mep.current_group_id.code}
+                        </GroupBadge>
+                      </div>
+                      <span className="text-gray-400 flex-shrink-0">
+                        {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      </span>
                     </div>
-                  )}
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      {s.mep.national_party_id.name} ({s.mep.national_party_id.code})
+                    </p>
 
-                  {noResults && (
-                    <p className="mt-2 text-xs text-gray-400 italic">Ingen brud inden for dette emne</p>
+                    {/* Loyalty bar */}
+                    <div className="mt-3">
+                      {hasTopicFilter ? (
+                        <LoyaltyBar
+                          loyalty={s.topicVoteCount > 0 ? ((s.topicVoteCount - filteredCount) / s.topicVoteCount) * 100 : 100}
+                          against={filteredCount}
+                          total={s.topicVoteCount}
+                        />
+                      ) : (
+                        <LoyaltyBar
+                          loyalty={s.mep.group_loyalty}
+                          against={s.mep.n_votes_against_group}
+                          total={s.mep.n_votes}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </button>
+
+              {/* Accordion body */}
+              {isExpanded && (
+                <div className="px-4 pb-4 pt-0 border-t border-gray-100">
+                  {filteredCount > 0 ? (
+                    <>
+                      <div className="pt-4">
+                        <AllyBar allies={s.topAllies} mepGroup={s.mep.current_group_id.code} groupDescriptions={groupDescriptions} />
+                      </div>
+                      <a
+                        href={detailHref}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleSelect(s.mep.mep_id);
+                        }}
+                        className="mt-4 flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                      >
+                        Se alle {filteredCount} afstemninger
+                        <ArrowRight className="w-4 h-4" />
+                      </a>
+                    </>
+                  ) : (
+                    <p className="pt-4 text-sm text-gray-500 italic">
+                      {s.mep.full_name} har ingen brud med {s.mep.current_group_id.code} inden for dette emne.
+                    </p>
                   )}
                 </div>
-              </div>
-            </button>
+              )}
+            </div>
           );
         })}
       </div>

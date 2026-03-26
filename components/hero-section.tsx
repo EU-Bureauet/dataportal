@@ -1,9 +1,10 @@
 interface HeroSectionProps {
   title: string;
+  subtitle?: string;
   image: string;
 }
 
-export function HeroSection({ title, image }: HeroSectionProps) {
+export function HeroSection({ title, subtitle, image }: HeroSectionProps) {
   const basePath = process.env.NEXT_PUBLIC_BASEPATH || "dataportal";
 
   return (
@@ -16,10 +17,17 @@ export function HeroSection({ title, image }: HeroSectionProps) {
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/40" />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white drop-shadow-lg text-center px-4">
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="text-center px-4 max-w-3xl">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white drop-shadow-lg">
             {title}
           </h1>
+          {subtitle && (
+            <p className="mt-4 text-base sm:text-lg text-[#FFCC00] drop-shadow-md">
+              {subtitle}
+            </p>
+          )}
         </div>
       </div>
       {/* Wave bottom border */}

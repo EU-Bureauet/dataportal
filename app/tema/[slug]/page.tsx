@@ -37,6 +37,7 @@ interface ThemeVisualisation {
 interface ThemeData {
   slug: string;
   title: string;
+  subtitle?: string;
   heroImage: string;
   articleFilter: ThemeArticleFilter;
   visualisations: ThemeVisualisation[];
@@ -197,7 +198,7 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       {/* Hero — full width, sits right below the sticky nav */}
-      <HeroSection title={theme.title} image={theme.heroImage} />
+      <HeroSection title={theme.title} subtitle={theme.subtitle} image={theme.heroImage} />
 
       {/* Two-column layout */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
