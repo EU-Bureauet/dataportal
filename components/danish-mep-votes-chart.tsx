@@ -620,16 +620,28 @@ export function DanishMEPVotesChart() {
                         />
                       )}
                     </div>
+
+                    {/* Red connector arrow when expanded */}
+                    {isExpanded && (
+                      <div className="flex justify-end pr-2 -mb-2">
+                        <svg width="20" height="16" viewBox="0 0 20 16" className="text-red-500">
+                          <path d="M10 0 L10 10 L6 6 M10 10 L14 6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    )}
                   </div>
                 </div>
               </button>
 
               {/* Accordion body */}
               {isExpanded && (
-                <div className="px-4 pb-4 pt-0 border-t border-gray-100">
+                <div className="px-4 pb-4 pt-0 border-t-2 border-red-400">
                   {filteredCount > 0 ? (
                     <>
-                      <div className="pt-4">
+                      <div className="pt-3 pb-1">
+                        <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-3">
+                          ↓ Brud med gruppen &mdash; hvem stemte {s.mep.family_name} med?
+                        </p>
                         <AllyBar allies={s.topAllies} mepGroup={s.mep.current_group_id.code} groupDescriptions={groupDescriptions} />
                       </div>
                       <a
