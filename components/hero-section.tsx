@@ -19,12 +19,14 @@ export function HeroSection({ title, subtitle, image }: HeroSectionProps) {
         <div className="absolute inset-0 bg-black/40" />
       </div>
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-center px-4 max-w-3xl">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white drop-shadow-lg">
+        <div className="relative text-center px-6 sm:px-10 py-6 sm:py-8 max-w-3xl">
+          {/* Soft radial glow behind text — no visible border */}
+          <div className="absolute inset-0 bg-black/45 rounded-[50%] blur-3xl scale-110 pointer-events-none" />
+          <h1 className="relative text-4xl sm:text-5xl md:text-6xl font-bold text-white drop-shadow-lg">
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-4 text-base sm:text-lg text-[#FFCC00] drop-shadow-md">
+            <p className="relative mt-4 text-base sm:text-lg text-[#FFCC00] drop-shadow-md">
               {subtitle}
             </p>
           )}
