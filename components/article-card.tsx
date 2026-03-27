@@ -11,8 +11,6 @@ export function ArticleCard({ title, description, image, url }: ArticleCardProps
   return (
     <a
       href={url}
-      target="_blank"
-      rel="noopener noreferrer"
       className="block bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow group"
     >
       <div className="relative w-full h-40">

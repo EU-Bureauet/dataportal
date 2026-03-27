@@ -21,6 +21,7 @@ const navigationLinks = [
 const themeLinks = [
   { href: '/tema/forsvar', label: 'Forsvar' },
   { href: '/tema/klima', label: 'Klima' },
+  { href: '/tema/migration', label: 'Migration' },
 ];
 
 export function NavigationHeader() {
