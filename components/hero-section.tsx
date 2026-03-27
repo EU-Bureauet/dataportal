@@ -36,11 +36,11 @@ export function HeroSection({ title, subtitle, image }: HeroSectionProps) {
         </div>
       </div>
 
-      {/* Bottom wave divider */}
-      <div className="absolute bottom-0 left-0 right-0">
+      {/* Bottom wave divider — hidden on mobile to avoid subpixel line artifact */}
+      <div className="absolute -bottom-px left-0 right-0 hidden sm:block">
         <svg
           viewBox="0 0 1440 100"
-          className="w-full h-auto"
+          className="block w-full h-auto"
           preserveAspectRatio="none"
         >
           <path
