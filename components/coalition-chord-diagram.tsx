@@ -566,7 +566,7 @@ export function CoalitionChordDiagram() {
 
           {/* Group tooltip — floats outside the chord card */}
           {hoveredGroup && (
-            <div className="hidden lg:block absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-50 min-w-[200px] max-w-[240px]">
+            <div className="hidden lg:block absolute right-0 top-1/2 -translate-y-1/2 translate-x-[calc(80%+16px)] mr-4 z-50 min-w-[200px] max-w-[240px]">
               <div className="rounded-xl border border-gray-100 shadow-lg overflow-hidden bg-white">
                 <div
                   className="h-1.5 w-full"
