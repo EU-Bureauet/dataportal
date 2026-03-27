@@ -533,7 +533,7 @@ export function CoalitionChordDiagram() {
           </div>
           {/* Figure caption */}
           <div className="mt-4 pt-3 border-t border-gray-100">
-            <p className="text-[10px] text-gray-400 leading-relaxed">
+            <p className="text-xs text-gray-500 leading-relaxed">
               Rangeret efter hvor ofte koalitionen har flertal. Jo højere procent, jo oftere stemmer grupperne sammen som vindende blok i {committeeName.toLowerCase()}.
             </p>
           </div>
@@ -555,10 +555,10 @@ export function CoalitionChordDiagram() {
             </div>
             {/* Figure caption */}
             <div className="mt-4 pt-3 border-t border-gray-100">
-              <p className="text-[10px] text-gray-400 leading-relaxed">
-                <strong className="text-gray-500">Buer</strong> langs ringen repræsenterer de politiske grupper — bredere bue = mere stemmeaktiv.{" "}
-                <strong className="text-gray-500">Bånd</strong> mellem grupperne viser enighed — tykkere bånd = oftere enige.{" "}
-                <strong className="text-gray-500">Hover</strong> over en gruppe for at isolere dens forbindelser.{" "}
+              <p className="text-xs text-gray-500 leading-relaxed">
+                <strong className="text-gray-600">Buer</strong> langs ringen repræsenterer de politiske grupper — bredere bue = mere stemmeaktiv.{" "}
+                <strong className="text-gray-600">Bånd</strong> mellem grupperne viser enighed — tykkere bånd = oftere enige.{" "}
+                <strong className="text-gray-600">Hover</strong> over en gruppe for at isolere dens forbindelser.{" "}
                 NI (Løsgængere) indgår ikke. Viser {activeGroups.length} grupper.
               </p>
             </div>
