@@ -13,9 +13,13 @@ export function HeroSection({ title, subtitle, image }: HeroSectionProps) {
       <img
         src={`/${basePath}${image}`}
         alt={title}
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover saturate-[1.25] contrast-[1.08]"
       />
-      <div className="absolute inset-0 bg-black/40" />
+
+      {/* Cinematic gradient overlay — darker edges, lighter centre */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/20 to-black/70" />
+      {/* Vignette — darkened corners */}
+      <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 100%)' }} />
 
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative text-center px-6 sm:px-10 py-6 sm:py-8 max-w-3xl">

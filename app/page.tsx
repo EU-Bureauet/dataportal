@@ -139,6 +139,34 @@ export default function LandingPage() {
           <p className="text-xl md:text-2xl text-gray-700 mb-4 max-w-3xl mx-auto">
             Få indsigt i hvordan Europa-Parlamentet stemmer
           </p>
+
+          {/* Theme exploration cards */}
+          <div className="mt-10 max-w-4xl mx-auto">
+            <p className="text-sm font-semibold uppercase tracking-widest text-gray-400 mb-4">Udforsk et tema</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { slug: 'forsvar', label: 'Sikkerhed & forsvar', emoji: '🛡️', gradient: 'from-blue-600 to-blue-800' },
+                { slug: 'klima', label: 'Klima & grøn omstilling', emoji: '🌱', gradient: 'from-green-600 to-emerald-800' },
+                { slug: 'migration', label: 'Migration & integration', emoji: '🌍', gradient: 'from-amber-600 to-orange-800' },
+              ].map((theme) => (
+                <Link
+                  key={theme.slug}
+                  href={`/tema/${theme.slug}`}
+                  className="group relative overflow-hidden rounded-xl p-5 text-left text-white shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-br ${theme.gradient}`} />
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-20 bg-white transition-opacity duration-300" />
+                  <div className="relative flex items-center gap-3">
+                    <span className="text-2xl">{theme.emoji}</span>
+                    <div>
+                      <h3 className="font-bold text-base leading-tight">{theme.label}</h3>
+                      <span className="text-xs text-white/70 group-hover:text-white/90 transition-colors">Udforsk tema →</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
