@@ -136,7 +136,7 @@ export function CoalitionChordDiagram() {
     fetcher,
   );
   const { data: winningData } = useSWR<
-    Record<string, { total_coalitions: WinningCoalition[] }>
+    Record<string, Record<string, unknown>>
   >(`${basePath}/data/All_Winning_coalitions.json`, fetcher);
   const { data: namesData } = useSWR<CommitteeNames>(
     `${basePath}/data/committee_and_group_names.json`,
@@ -171,7 +171,6 @@ export function CoalitionChordDiagram() {
   const tooltipTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const svgRef = useRef<SVGSVGElement>(null);
-  const detailBarRef = useRef<SVGSVGElement>(null);
 
   // Active groups for this committee
   const activeGroups = useMemo(() => {
@@ -205,34 +204,36 @@ export function CoalitionChordDiagram() {
     return { matrix: m, pairMap: pm };
   }, [pairwiseData, selectedCommittee, activeGroups]);
 
+  // Helper: extract coalitions array from either format
+  // TOTAL uses { total_coalitions: [...] }, committees use { "0": {...}, "1": {...}, ... }
+  const getCoalitionsArray = useCallback(
+    (committee: string): WinningCoalition[] => {
+      if (!winningData) return [];
+      const cat = winningData[committee] ?? winningData["TOTAL"];
+      if (!cat) return [];
+      if (Array.isArray(cat.total_coalitions)) return cat.total_coalitions as WinningCoalition[];
+      return (Object.values(cat) as WinningCoalition[]).filter(
+        (v) => v && typeof v === "object" && "Winning Coalition" in v,
+      );
+    },
+    [winningData],
+  );
+
   // Winning coalitions
   const coalitions = useMemo(() => {
-    if (!winningData) return [];
-    const cat = winningData[selectedCommittee] ?? winningData["TOTAL"];
-    return (cat?.total_coalitions ?? []).slice(0, 6);
-  }, [winningData, selectedCommittee]);
+    return getCoalitionsArray(selectedCommittee).slice(0, 6);
+  }, [getCoalitionsArray, selectedCommittee]);
+
 
   const activeCoalition = coalitions[selectedCoalition] ?? coalitions[0];
 
   // Preview top-3 coalitions for any committee (used in tooltips)
   const getTopCoalitions = useCallback(
     (code: string) => {
-      if (!winningData) return [];
-      const cat = winningData[code] ?? winningData["TOTAL"];
-      return (cat?.total_coalitions ?? []).slice(0, 3);
+      return getCoalitionsArray(code).slice(0, 3);
     },
-    [winningData],
+    [getCoalitionsArray],
   );
-
-  // Pairwise data for the selected coalition's groups
-  const coalitionPairDetails = useMemo(() => {
-    if (!activeCoalition || !pairwiseData) return [];
-    const entries = pairwiseData[selectedCommittee] ?? pairwiseData["TOTAL"] ?? [];
-    const coalGroups = new Set(activeCoalition["Winning Coalition"]);
-    return entries
-      .filter((e) => coalGroups.has(e["Group Pair"][0]) && coalGroups.has(e["Group Pair"][1]))
-      .sort((a, b) => b.Percentage - a.Percentage);
-  }, [activeCoalition, pairwiseData, selectedCommittee]);
 
   // ─── D3 chord diagram ─────────────────────────────────────────────────────
 
@@ -352,87 +353,6 @@ export function CoalitionChordDiagram() {
       svg.selectAll(".ribbons path").style("opacity", 0.55);
     }
   }, [hoveredGroup, activeGroups, activeCoalition]);
-
-  // ─── Detail bar chart for selected coalition ───────────────────────────────
-
-  const drawDetailBar = useCallback(() => {
-    const svg = d3.select(detailBarRef.current);
-    svg.selectAll("*").remove();
-    if (coalitionPairDetails.length === 0) return;
-
-    const container = detailBarRef.current?.parentElement;
-    const fullW = container?.clientWidth ?? 500;
-    const margin = { top: 6, right: 16, bottom: 20, left: 90 };
-    const w = fullW - margin.left - margin.right;
-    const barH = 26;
-    const gap = 6;
-    const h = coalitionPairDetails.length * (barH + gap);
-
-    svg.attr("viewBox", `0 0 ${fullW} ${h + margin.top + margin.bottom}`);
-
-    const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
-
-    const x = d3.scaleLinear().domain([0, 100]).range([0, w]);
-
-    coalitionPairDetails.forEach((e, i) => {
-      const y = i * (barH + gap);
-      const label = `${e["Group Pair"][0]} + ${e["Group Pair"][1]}`;
-      const pct = e.Percentage;
-
-      // Label
-      g.append("text")
-        .attr("x", -6)
-        .attr("y", y + barH / 2)
-        .attr("dy", ".35em")
-        .attr("text-anchor", "end")
-        .attr("font-size", "10px")
-        .attr("fill", "#6b7280")
-        .text(label);
-
-      // Background bar
-      g.append("rect")
-        .attr("x", 0)
-        .attr("y", y)
-        .attr("width", w)
-        .attr("height", barH)
-        .attr("rx", 4)
-        .attr("fill", "#f3f4f6");
-
-      // Coloured gradient bar
-      const gradId = `grad-${i}`;
-      const defs = svg.select("defs").empty() ? svg.append("defs") : svg.select("defs");
-      const grad = defs.append("linearGradient").attr("id", gradId);
-      grad.append("stop").attr("offset", "0%").attr("stop-color", GROUP_COLORS[e["Group Pair"][0]] ?? "#888");
-      grad.append("stop").attr("offset", "100%").attr("stop-color", GROUP_COLORS[e["Group Pair"][1]] ?? "#888");
-
-      g.append("rect")
-        .attr("x", 0)
-        .attr("y", y)
-        .attr("width", 0)
-        .attr("height", barH)
-        .attr("rx", 4)
-        .attr("fill", `url(#${gradId})`)
-        .attr("opacity", 0.85)
-        .transition()
-        .duration(600)
-        .delay(i * 60)
-        .attr("width", x(pct));
-
-      // Percentage text
-      g.append("text")
-        .attr("x", x(pct) + 6)
-        .attr("y", y + barH / 2)
-        .attr("dy", ".35em")
-        .attr("font-size", "11px")
-        .attr("font-weight", "600")
-        .attr("fill", "#374151")
-        .text(`${pct.toFixed(1)}%`);
-    });
-  }, [coalitionPairDetails]);
-
-  useEffect(() => {
-    drawDetailBar();
-  }, [drawDetailBar]);
 
   const committeeName = useMemo(() => {
     if (selectedCommittee === "TOTAL") return "Alle udvalg";
@@ -592,13 +512,73 @@ export function CoalitionChordDiagram() {
             </div>
           </div>
 
+
+        </div>
+
+        {/* ── Right: chord diagram + coalitions ─────────────────────── */}
+        <div className="lg:col-span-8 space-y-6">
+
+          {/* Context bar */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-6 rounded-full bg-blue-600" />
+              <span className="text-base font-bold text-gray-900">{committeeName}</span>
+            </div>
+            <span className="hidden sm:inline text-xs text-gray-400">
+              Hold musen over en gruppe for at udforske alliancer
+            </span>
+          </div>
+
+          {/* Chord card — relative wrapper for tooltip positioning */}
+          <div className="relative">
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6">
+              <div className="flex justify-center">
+                {/* Chord SVG */}
+                <div className="w-full max-w-[600px]">
+                  <svg ref={svgRef} className="w-full h-auto" style={{ maxHeight: "600px" }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Group tooltip — floats outside the chord card */}
+            {hoveredGroup && (
+              <div className="hidden lg:block absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-50 min-w-[200px] max-w-[240px]">
+              <div className="rounded-xl border border-gray-100 shadow-lg overflow-hidden bg-white">
+                {/* Color accent bar */}
+                <div
+                  className="h-1.5 w-full"
+                  style={{ backgroundColor: GROUP_COLORS[hoveredGroup] }}
+                />
+                <div className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span
+                      className="inline-block px-2.5 py-1 rounded-lg text-white text-xs font-bold"
+                      style={{ backgroundColor: GROUP_COLORS[hoveredGroup] }}
+                    >
+                      {hoveredGroup}
+                    </span>
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900 mb-1">
+                    {namesData?.political_group_names?.[hoveredGroup] ?? ""}
+                  </p>
+                  {groupDescriptions.get(hoveredGroup) && (
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      {groupDescriptions.get(hoveredGroup)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          </div>
+
           {/* Coalitions list */}
           <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 sm:p-6">
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-sm font-bold text-gray-900">Hyppigste koalitioner</h3>
             </div>
             <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-              Klik for at fremhæve i diagrammet.
+              De {coalitions.length} mest forekommende vindende koalitioner i {committeeName.toLowerCase()}. Klik for at fremhæve i diagrammet.
             </p>
             <div className="space-y-1.5">
               {coalitions.map((c, i) => {
@@ -657,127 +637,7 @@ export function CoalitionChordDiagram() {
                 );
               })}
             </div>
-            <a
-              href={`${basePath}/winning-coalitions`}
-              className="mt-4 inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-semibold transition-colors group/link"
-            >
-              Se alle vindende koalitioner{" "}
-              <span className="transition-transform group-hover/link:translate-x-0.5">→</span>
-            </a>
           </div>
-        </div>
-
-        {/* ── Right: chord diagram + detail panel ────────────────────── */}
-        <div className="lg:col-span-8 space-y-6 relative">
-
-          {/* Context bar */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-6 rounded-full bg-blue-600" />
-              <span className="text-base font-bold text-gray-900">{committeeName}</span>
-            </div>
-            <span className="hidden sm:inline text-xs text-gray-400">
-              Hold musen over en gruppe for at udforske alliancer
-            </span>
-          </div>
-
-          {/* Chord card */}
-          <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6">
-            <div className="flex justify-center">
-              {/* Chord SVG */}
-              <div className="w-full max-w-[600px]">
-                <svg ref={svgRef} className="w-full h-auto" style={{ maxHeight: "600px" }} />
-              </div>
-            </div>
-          </div>
-
-          {/* Group tooltip — floats outside the chord card */}
-          {hoveredGroup && (
-            <div className="hidden lg:block absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-50 min-w-[200px] max-w-[240px]">
-              <div className="rounded-xl border border-gray-100 shadow-lg overflow-hidden bg-white">
-                {/* Color accent bar */}
-                <div
-                  className="h-1.5 w-full"
-                  style={{ backgroundColor: GROUP_COLORS[hoveredGroup] }}
-                />
-                <div className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span
-                      className="inline-block px-2.5 py-1 rounded-lg text-white text-xs font-bold"
-                      style={{ backgroundColor: GROUP_COLORS[hoveredGroup] }}
-                    >
-                      {hoveredGroup}
-                    </span>
-                  </div>
-                  <p className="text-sm font-semibold text-gray-900 mb-1">
-                    {namesData?.political_group_names?.[hoveredGroup] ?? ""}
-                  </p>
-                  {groupDescriptions.get(hoveredGroup) && (
-                    <p className="text-xs text-gray-500 leading-relaxed">
-                      {groupDescriptions.get(hoveredGroup)}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Detail panel for selected coalition */}
-          {activeCoalition && (
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-              {/* Gradient accent strip using coalition colors */}
-              <div
-                className="h-1.5 w-full"
-                style={{
-                  background: `linear-gradient(90deg, ${activeCoalition["Winning Coalition"].map((g) => GROUP_COLORS[g] ?? "#888").join(", ")})`,
-                }}
-              />
-              <div className="p-5 sm:p-6">
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900 mb-2">
-                      Koalitionsdetaljer
-                    </h3>
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {activeCoalition["Winning Coalition"].map((g, gi) => (
-                        <span key={g} className="flex items-center gap-0.5">
-                          <span
-                            className="text-xs px-2 py-0.5 rounded-md font-bold text-white"
-                            style={{ backgroundColor: GROUP_COLORS[g] ?? "#888" }}
-                          >
-                            {g}
-                          </span>
-                          {gi < activeCoalition["Winning Coalition"].length - 1 && (
-                            <span className="text-gray-300 font-medium">+</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-3xl font-bold text-gray-900">{activeCoalition.Percentage.toFixed(1)}%</div>
-                    <div className="text-[11px] text-gray-500 font-medium">af afstemninger</div>
-                  </div>
-                </div>
-
-                <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-                  Vinder i {activeCoalition.Count.toLocaleString("da-DK")} ud af{" "}
-                  {(pairwiseData[selectedCommittee] ?? pairwiseData["TOTAL"])?.[0]?.Total.toLocaleString("da-DK") ?? "?"}{" "}
-                  afstemninger i {committeeName.toLowerCase()}.
-                  Nedenfor ses den interne enighed — jo højere procent, jo tættere samarbejde.
-                </p>
-
-                {/* D3 horizontal bar chart */}
-                <div className="w-full">
-                  <svg
-                    ref={detailBarRef}
-                    className="w-full"
-                    style={{ height: `${coalitionPairDetails.length * 32 + 26}px` }}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
