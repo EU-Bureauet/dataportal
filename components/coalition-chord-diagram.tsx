@@ -165,6 +165,7 @@ export function CoalitionChordDiagram() {
 
   const [selectedCommittee, setSelectedCommittee] = useState(committee);
   const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
+  const [hoveredBadgeGroup, setHoveredBadgeGroup] = useState<string | null>(null);
   const [selectedCoalition, setSelectedCoalition] = useState<number>(0);
   const [tooltipCommittee, setTooltipCommittee] = useState<string | null>(null);
 
@@ -372,15 +373,13 @@ export function CoalitionChordDiagram() {
     <div className="space-y-6">
 
       {/* ── Row 1: Full-width policy area selector ───────────────────── */}
-      <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-5">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-1.5 h-6 rounded-full bg-blue-600" />
-          <div>
-            <h3 className="text-sm font-bold text-gray-900">Politikområde</h3>
-            <p className="text-[11px] text-gray-500">Skift mellem områder for at se hvordan koalitionerne ændrer sig.</p>
-          </div>
+      <div className="bg-white rounded-xl shadow-md border border-gray-100 px-4 py-3 sm:px-5">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-1 h-5 rounded-full bg-blue-600" />
+          <h3 className="text-sm font-bold text-gray-900">Politikområde</h3>
+          <p className="text-[11px] text-gray-400 hidden sm:block">Skift område for at se hvordan koalitionerne ændrer sig</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {availableCommittees.map((c) => {
             const isActive = selectedCommittee === c.code;
             const isTooltipOpen = tooltipCommittee === c.code && !isActive;
@@ -397,17 +396,15 @@ export function CoalitionChordDiagram() {
                     if (tooltipTimeout.current) clearTimeout(tooltipTimeout.current);
                     tooltipTimeout.current = setTimeout(() => setTooltipCommittee(null), 200);
                   }}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer text-left ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer text-left ${
                     isActive
                       ? "bg-blue-50 text-gray-900 border border-blue-300 shadow-sm"
                       : "bg-gray-50 text-gray-700 hover:bg-white hover:shadow-md border border-transparent hover:border-gray-200"
                   }`}
                 >
                   <span className="flex-shrink-0">{c.icon}</span>
-                  <div className="min-w-0">
-                    <span className="text-sm font-semibold block leading-tight">{c.label}</span>
-                    <span className={`text-[10px] ${isActive ? "text-blue-500" : "text-gray-400"}`}>{c.code}</span>
-                  </div>
+                  <span className="text-xs font-semibold leading-tight">{c.label}</span>
+                  <span className={`text-[10px] ${isActive ? "text-blue-500" : "text-gray-400"}`}>{c.code}</span>
                 </button>
 
                 {/* Tooltip: coalition preview on hover */}
@@ -498,19 +495,47 @@ export function CoalitionChordDiagram() {
                         {i + 1}
                       </span>
                       <div className="flex items-center gap-0.5 flex-wrap">
-                        {c["Winning Coalition"].map((g, gi) => (
+                        {c["Winning Coalition"].map((g, gi) => {
+                          const badgeKey = `${i}-${g}`;
+                          return (
                           <span key={g} className="flex items-center gap-0.5">
                             <span
-                              className="text-[10px] px-1.5 py-0.5 rounded font-bold text-white"
-                              style={{ backgroundColor: GROUP_COLORS[g] ?? "#888" }}
+                              className="relative"
+                              onMouseEnter={(e) => { e.stopPropagation(); setHoveredBadgeGroup(badgeKey); }}
+                              onMouseLeave={() => setHoveredBadgeGroup(null)}
+                              onFocus={() => setHoveredBadgeGroup(badgeKey)}
+                              onBlur={() => setHoveredBadgeGroup(null)}
                             >
-                              {g}
+                              <span
+                                className="text-[10px] px-1.5 py-0.5 rounded font-bold text-white cursor-help inline-block"
+                                style={{ backgroundColor: GROUP_COLORS[g] ?? "#888" }}
+                              >
+                                {g}
+                              </span>
+                              {hoveredBadgeGroup === badgeKey && (
+                                <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 w-52 pointer-events-none">
+                                  <span className="block rounded-lg border border-gray-100 shadow-lg bg-white overflow-hidden">
+                                    <span className="block h-1 w-full" style={{ backgroundColor: GROUP_COLORS[g] ?? "#888" }} />
+                                    <span className="block p-3">
+                                      <span className="flex items-center gap-1.5 mb-1">
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded font-bold text-white" style={{ backgroundColor: GROUP_COLORS[g] ?? "#888" }}>{g}</span>
+                                      </span>
+                                      <span className="block text-xs font-semibold text-gray-900 mb-0.5">{namesData?.political_group_names?.[g] ?? ""}</span>
+                                      {groupDescriptions.get(g) && (
+                                        <span className="block text-[11px] text-gray-500 leading-snug">{groupDescriptions.get(g)}</span>
+                                      )}
+                                    </span>
+                                  </span>
+                                  <span className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-white border-r border-b border-gray-100 rotate-45" />
+                                </span>
+                              )}
                             </span>
                             {gi < c["Winning Coalition"].length - 1 && (
                               <span className="text-gray-300 text-[10px]">+</span>
                             )}
                           </span>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                     <span className="text-sm font-bold text-gray-900 tabular-nums">{c.Percentage.toFixed(1)}%</span>
