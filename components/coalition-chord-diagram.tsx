@@ -4,7 +4,7 @@ import React, { useRef, useEffect, useState, useMemo, useCallback } from "react"
 import * as d3 from "d3";
 import useSWR from "swr";
 import { useSearchParams } from "next/navigation";
-import { Shield, Globe, Leaf, Zap, TrainFront, Wheat, BarChart3, MousePointer, Lightbulb, CircleDot, Link2 } from "lucide-react";
+import { Shield, Globe, Leaf, Zap, TrainFront, Wheat, BarChart3 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -464,17 +464,17 @@ export function CoalitionChordDiagram() {
       </div>
 
       {/* ── Row 2: Two equal charts side by side ─────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
 
         {/* Coalitions list */}
-        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 sm:p-6">
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 sm:p-6 flex flex-col">
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-sm font-bold text-gray-900">Hyppigste koalitioner</h3>
           </div>
           <p className="text-xs text-gray-500 mb-4 leading-relaxed">
             De {coalitions.length} mest forekommende vindende koalitioner i {committeeName.toLowerCase()}. Klik for at fremhæve i diagrammet.
           </p>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 flex-1">
             {coalitions.map((c, i) => {
               const coalKey = c["Winning Coalition"].join("+");
               const isActive = selectedCoalition === i;
@@ -531,21 +531,36 @@ export function CoalitionChordDiagram() {
               );
             })}
           </div>
+          {/* Figure caption */}
+          <div className="mt-4 pt-3 border-t border-gray-100">
+            <p className="text-[10px] text-gray-400 leading-relaxed">
+              Rangeret efter hvor ofte koalitionen har flertal. Jo højere procent, jo oftere stemmer grupperne sammen som vindende blok i {committeeName.toLowerCase()}.
+            </p>
+          </div>
         </div>
 
         {/* Chord diagram */}
-        <div className="relative">
-          <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6">
+        <div className="relative flex flex-col">
+          <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 flex flex-col flex-1">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-sm font-bold text-gray-900">{committeeName}</span>
               <span className="hidden sm:inline text-[11px] text-gray-400">
                 Hover over en gruppe for at udforske
               </span>
             </div>
-            <div className="flex justify-center">
+            <div className="flex justify-center flex-1 items-center">
               <div className="w-full max-w-[500px]">
                 <svg ref={svgRef} className="w-full h-auto" style={{ maxHeight: "500px" }} />
               </div>
+            </div>
+            {/* Figure caption */}
+            <div className="mt-4 pt-3 border-t border-gray-100">
+              <p className="text-[10px] text-gray-400 leading-relaxed">
+                <strong className="text-gray-500">Buer</strong> langs ringen repræsenterer de politiske grupper — bredere bue = mere stemmeaktiv.{" "}
+                <strong className="text-gray-500">Bånd</strong> mellem grupperne viser enighed — tykkere bånd = oftere enige.{" "}
+                <strong className="text-gray-500">Hover</strong> over en gruppe for at isolere dens forbindelser.{" "}
+                NI (Løsgængere) indgår ikke. Viser {activeGroups.length} grupper.
+              </p>
             </div>
           </div>
 
@@ -578,36 +593,6 @@ export function CoalitionChordDiagram() {
               </div>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* ── Row 3: Full-width explainer ──────────────────────────────── */}
-      <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 sm:p-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Lightbulb className="w-4 h-4 text-gray-400 flex-shrink-0" />
-          <span className="text-sm font-bold text-gray-900">Sådan læser du diagrammet</span>
-        </div>
-        <div className="flex flex-col sm:flex-row sm:gap-8">
-          <div className="flex-1 space-y-2.5">
-            {[
-              { icon: <CircleDot className="w-3.5 h-3.5 text-gray-400" />, label: "Buer", text: "langs ringen repræsenterer de politiske grupper. Bredere bue = mere stemmeaktiv." },
-              { icon: <Link2 className="w-3.5 h-3.5 text-gray-400" />, label: "Bånd", text: "mellem grupperne viser enighed. Tykkere bånd = oftere enige." },
-              { icon: <MousePointer className="w-3.5 h-3.5 text-gray-400" />, label: "Hover", text: "over en gruppe for at isolere dens forbindelser." },
-            ].map((item) => (
-              <div key={item.label} className="flex items-start gap-2.5">
-                <span className="mt-0.5 flex-shrink-0 w-5 flex justify-center">{item.icon}</span>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  <strong className="text-gray-800">{item.label}</strong> {item.text}
-                </p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-t-0 sm:border-l border-gray-100 sm:pl-8">
-            <p className="text-[10px] text-gray-400 leading-relaxed">
-              <strong className="text-gray-500">NI (Løsgængere)</strong> indgår ikke, da de ikke stemmer
-              koordineret som gruppe. Viser {activeGroups.length} politiske grupper.
-            </p>
-          </div>
         </div>
       </div>
     </div>
