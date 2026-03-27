@@ -196,7 +196,7 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
   const articles = getThemeArticles(theme.articleFilter);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+    <div>
       {/* Hero — full width, sits right below the sticky nav */}
       <HeroSection title={theme.title} subtitle={theme.subtitle} image={theme.heroImage} />
 
