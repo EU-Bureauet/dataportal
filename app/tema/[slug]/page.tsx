@@ -205,7 +205,7 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Left column — Articles (30%) */}
           <aside className="w-full lg:w-[30%] lg:border-r lg:border-gray-200 lg:pr-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Artikler</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-6"></h2>
             <ThemeArticles
               filter={theme.articleFilter}
               fallbackArticles={articles}
@@ -214,7 +214,7 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
 
           {/* Right column — Visualisations (70%), sticky on desktop */}
           <section className="w-full lg:w-[70%] lg:self-start lg:sticky lg:top-24">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Visualiseringer</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-6"></h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {theme.visualisations.map((vis) => (
                 <VisualisationCard
