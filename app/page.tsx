@@ -4,6 +4,9 @@ import React from 'react';
 import Link from 'next/link';
 import { Card } from "@/components/ui/card";
 import NewsCarousel from "@/components/news-carousel";
+import forsvarTheme from "@/data/themes/forsvar.json";
+import miljoeTheme from "@/data/themes/miljoe.json";
+import energiTheme from "@/data/themes/energi.json";
 
 interface FeatureCard {
   title: string;
@@ -145,9 +148,9 @@ export default function LandingPage() {
             <p className="text-sm font-semibold uppercase tracking-widest text-gray-400 mb-4">Udforsk et tema</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
-                { slug: 'forsvar', label: 'Sikkerhed & forsvar', emoji: '🛡️', gradient: 'from-blue-600 to-blue-800' },
-                { slug: 'klima', label: 'Klima & grøn omstilling', emoji: '🌱', gradient: 'from-green-600 to-emerald-800' },
-                { slug: 'migration', label: 'Migration & integration', emoji: '🌍', gradient: 'from-amber-600 to-orange-800' },
+                { slug: forsvarTheme.slug, label: forsvarTheme.title, emoji: '🛡️', gradient: 'from-blue-600 to-blue-800' },
+                { slug: miljoeTheme.slug, label: miljoeTheme.title, emoji: '🌱', gradient: 'from-green-600 to-emerald-800' },
+                { slug: energiTheme.slug, label: energiTheme.title, emoji: '⚡', gradient: 'from-amber-600 to-orange-800' },
               ].map((theme) => (
                 <Link
                   key={theme.slug}
