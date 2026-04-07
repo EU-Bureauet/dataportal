@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import useSWR from "swr";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
 
@@ -589,13 +590,6 @@ export function DanishMEPVotesChart() {
           const filteredCount = s.filteredDisagreements.length;
           const isExpanded = expandedMEP === s.mep.mep_id;
 
-          // Build detail link with current filters preserved
-          const detailParams = new URLSearchParams();
-          detailParams.set("mep", s.mep.mep_id);
-          if (searchFilter) detailParams.set("search", searchFilter);
-          if (eurovocFilter) detailParams.set("eurovoc", eurovocFilter);
-          const detailHref = `${basePath}/danish-mep-votes?${detailParams.toString()}`;
-
           return (
             <div
               key={s.mep.mep_id}
@@ -710,17 +704,19 @@ export function DanishMEPVotesChart() {
                         </p>
                         <AllyBar allies={s.topAllies} mepGroup={s.mep.current_group_id.code} groupDescriptions={groupDescriptions} />
                       </div>
-                      <a
-                        href={detailHref}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleSelect(s.mep.mep_id);
-                        }}
+                      <Link
+                        href={(() => {
+                          const params = new URLSearchParams();
+                          params.set("mep", s.mep.family_name);
+                          if (searchFilter) params.set("search", searchFilter);
+                          if (eurovocFilter) params.set("eurovoc", eurovocFilter);
+                          return `/latest-votes?${params.toString()}`;
+                        })()}
                         className="mt-4 flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                       >
-                        Se alle {filteredCount} afstemninger
+                        Se seneste afstemninger
                         <ArrowRight className="w-4 h-4" />
-                      </a>
+                      </Link>
                     </>
                   ) : (
                     <p className="pt-4 text-sm text-gray-500 italic">

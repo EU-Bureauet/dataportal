@@ -117,20 +117,49 @@ function LatestVotesContent() {
   const [committeeDisplayLimit, setCommitteeDisplayLimit] = useState(15);
   const [eurovocDisplayLimit, setEurovocDisplayLimit] = useState(15);
 
-  // Initialize filters from URL query params (e.g. ?search=forsvar&eurovoc=forsvarspolitik&committee=...)
+  const [selectedMep, setSelectedMep] = useState<string | null>(null);
+
+  // Initialize filters from URL query params (e.g. ?search=forsvar&eurovoc=forsvarspolitik&committee=...&mep=...)
   const [initializedFromUrl, setInitializedFromUrl] = useState(false);
   useEffect(() => {
     if (initializedFromUrl) return;
     const qSearch = searchParams.get("search");
     const qEurovoc = searchParams.get("eurovoc");
     const qCommittee = searchParams.get("committee");
+    const qMep = searchParams.get("mep");
     if (qSearch) setSearchQuery(qSearch);
     if (qEurovoc) setSelectedEurovoc(qEurovoc);
     if (qCommittee) setSelectedCommittee(qCommittee);
+    if (qMep) setSelectedMep(qMep);
     setInitializedFromUrl(true);
   }, [searchParams, initializedFromUrl]);
   const url = `/${basePath}/data/latest_votes.json`;
   const { data, error, isLoading } = useSWR<LatestVotesData>(url, fetcher);
+
+  // Fetch disagreements data for MEP filtering
+  interface Disagreement {
+    "Vote ID": string;
+    "MEP Name": string;
+  }
+  interface BrudData {
+    mep_vs_party: { disagreements: Disagreement[] };
+  }
+  const { data: brudData } = useSWR<BrudData>(
+    selectedMep ? `/${basePath}/data/Danske_MEPs_brud_med_partigruppelinjen.json` : null,
+    fetcher
+  );
+
+  // Build set of vote IDs where the selected MEP broke with their group
+  const mepBreakVoteIds = useMemo(() => {
+    if (!selectedMep || !brudData) return null;
+    const ids = new Set<string>();
+    for (const d of brudData.mep_vs_party.disagreements) {
+      if (d["MEP Name"] === selectedMep) {
+        ids.add(String(d["Vote ID"]));
+      }
+    }
+    return ids;
+  }, [selectedMep, brudData]);
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const hasActiveSearch = normalizedQuery.length >= 2;
@@ -298,9 +327,19 @@ function LatestVotesContent() {
         group.eurovoc_keywords.includes(selectedEurovoc)
       );
     }
+
+    // Filter by MEP break votes: keep only votes where the MEP broke with their group
+    if (mepBreakVoteIds && mepBreakVoteIds.size > 0) {
+      filtered = filtered
+        .map((group) => ({
+          ...group,
+          votes: group.votes.filter((v) => mepBreakVoteIds.has(String(v.vote_id))),
+        }))
+        .filter((group) => group.votes.length > 0);
+    }
     
     return filtered;
-  }, [groupedVotes, selectedCommittee, selectedEurovoc, searchRegex]);
+  }, [groupedVotes, selectedCommittee, selectedEurovoc, searchRegex, mepBreakVoteIds]);
 
   const totalVotesFound = useMemo(() => {
     return filteredGroups.reduce((total, group) => total + group.votes.length, 0);
@@ -320,17 +359,17 @@ function LatestVotesContent() {
   // Reset to page 1 when filter changes
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCommittee, selectedEurovoc, searchQuery]);
+  }, [selectedCommittee, selectedEurovoc, searchQuery, selectedMep]);
 
   // Reset eurovoc display limit when committee or eurovoc filter changes
   React.useEffect(() => {
     setEurovocDisplayLimit(10);
-  }, [selectedCommittee, selectedEurovoc, searchQuery]);
+  }, [selectedCommittee, selectedEurovoc, searchQuery, selectedMep]);
 
   // Reset committee display limit when eurovoc or committee filter changes
   React.useEffect(() => {
     setCommitteeDisplayLimit(10);
-  }, [selectedCommittee, selectedEurovoc, searchQuery]);
+  }, [selectedCommittee, selectedEurovoc, searchQuery, selectedMep]);
 
   if (isLoading) {
     return (
@@ -360,6 +399,52 @@ function LatestVotesContent() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold">Seneste afstemninger</h1>
         </div>
+
+        {/* Active filter indicators */}
+        {(selectedMep || selectedEurovoc || selectedCommittee) && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-blue-900">Aktive filtre</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedMep(null);
+                  setSelectedEurovoc(null);
+                  setSelectedCommittee(null);
+                  setSearchQuery("");
+                }}
+                className="text-xs text-blue-600 hover:text-blue-800 underline cursor-pointer"
+              >
+                Nulstil alle
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {selectedMep && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                  MEP: {selectedMep}
+                  <button type="button" onClick={() => setSelectedMep(null)} className="hover:text-red-600 cursor-pointer" aria-label="Fjern MEP filter">✕</button>
+                </span>
+              )}
+              {selectedEurovoc && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                  Emneord: {selectedEurovoc}
+                  <button type="button" onClick={() => setSelectedEurovoc(null)} className="hover:text-purple-600 cursor-pointer" aria-label="Fjern emneord filter">✕</button>
+                </span>
+              )}
+              {selectedCommittee && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-emerald-100 text-emerald-800">
+                  Udvalg: {selectedCommittee}
+                  <button type="button" onClick={() => setSelectedCommittee(null)} className="hover:text-emerald-600 cursor-pointer" aria-label="Fjern udvalg filter">✕</button>
+                </span>
+              )}
+            </div>
+            {selectedMep && (
+              <p className="text-xs text-blue-700 mt-2">
+                Viser kun afstemninger hvor {selectedMep} stemte imod sin partigruppe.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Search */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
