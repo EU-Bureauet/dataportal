@@ -278,7 +278,7 @@ export function ParliamentHemicycle() {
         Europa-Parlamentet – politiske grupper
       </h3>
       <p className="text-sm text-gray-500 mb-4 text-center">
-        {totalSeats} medlemmer fordelt på {groups.length} grupper · Hold musen over en gruppe for mere information
+        Medlemmer fordelt på {groups.length} grupper · Hold musen over en gruppe for mere information
       </p>
 
       <div className="relative">
