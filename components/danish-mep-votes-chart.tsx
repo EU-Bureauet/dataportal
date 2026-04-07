@@ -166,31 +166,48 @@ function GroupBadge({
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function LoyaltyBar({ loyalty, against, total }: { loyalty: number; against: number; total: number }) {
-  const loyalPct = total > 0 ? ((total - against) / total) * 100 : 100;
-  const againstPct = 100 - loyalPct;
+function LoyaltyBar({ loyalty, against, total, participationPct }: { loyalty: number; against: number; total: number; participationPct?: number }) {
+  // If we have participation data, scale the bar to include absent votes
+  const hasAbsent = participationPct !== undefined && participationPct < 100;
+  const absentPct = hasAbsent ? 100 - participationPct : 0;
+  const activePct = 100 - absentPct;
+  const loyalPct = total > 0 ? ((total - against) / total) * activePct : activePct;
+  const againstPct = total > 0 ? (against / total) * activePct : 0;
 
   return (
     <div className="w-full">
-      <div className="flex justify-between text-xs text-gray-500 mb-1">
-        <span>Med gruppen: {(total - against).toLocaleString("da-DK")}</span>
-        <span className="text-red-600 font-medium">Brud: {against.toLocaleString("da-DK")}</span>
+      <div className="flex text-xs text-gray-500 mb-1">
+        <span style={{ width: `${loyalPct}%` }} className="truncate">Med gruppen: {(total - against).toLocaleString("da-DK")}</span>
+        <span style={{ width: `${againstPct}%` }} className="text-red-600 font-medium text-center truncate">Brud: {against.toLocaleString("da-DK")}</span>
+        {hasAbsent && (
+          <span style={{ width: `${absentPct}%` }} className="text-gray-400 text-right truncate">Fravær</span>
+        )}
       </div>
       <div className="w-full h-4 rounded-full bg-gray-100 overflow-hidden flex">
         <div
           className="h-full bg-emerald-500 transition-all duration-500"
           style={{ width: `${loyalPct}%` }}
-          title={`${loyalty.toFixed(1)}% loyalitet`}
+          title={`${loyalPct.toFixed(1)}% loyalitet`}
         />
         <div
           className="h-full bg-red-500 transition-all duration-500"
           style={{ width: `${againstPct}%` }}
           title={`${againstPct.toFixed(1)}% brud`}
         />
+        {hasAbsent && (
+          <div
+            className="h-full bg-gray-300 transition-all duration-500"
+            style={{ width: `${absentPct}%` }}
+            title={`${absentPct.toFixed(1)}% fravær`}
+          />
+        )}
       </div>
-      <div className="flex justify-between text-xs mt-1">
-        <span className="text-emerald-700 font-medium">{loyalty.toFixed(1)}% loyal</span>
-        <span className="text-red-600 font-medium">{againstPct.toFixed(1)}% brud</span>
+      <div className="flex text-xs mt-1">
+        <span style={{ width: `${loyalPct}%` }} className="text-emerald-700 font-medium truncate">{loyalPct.toFixed(1)}% loyal</span>
+        <span style={{ width: `${againstPct}%` }} className="text-red-600 font-medium text-center truncate">{againstPct.toFixed(1)}% brud</span>
+        {hasAbsent && (
+          <span style={{ width: `${absentPct}%` }} className="text-gray-400 font-medium text-right truncate">{absentPct.toFixed(1)}% fravær</span>
+        )}
       </div>
     </div>
   );
@@ -606,29 +623,62 @@ export function DanishMEPVotesChart() {
 
                     {/* Loyalty bar */}
                     <div className="mt-3">
-                      {hasTopicFilter ? (
-                        <LoyaltyBar
-                          loyalty={s.topicVoteCount > 0 ? ((s.topicVoteCount - filteredCount) / s.topicVoteCount) * 100 : 100}
-                          against={filteredCount}
-                          total={s.topicVoteCount}
-                        />
-                      ) : (
-                        <LoyaltyBar
-                          loyalty={s.mep.group_loyalty}
-                          against={s.mep.n_votes_against_group}
-                          total={s.mep.n_votes}
-                        />
-                      )}
-                    </div>
+                      {(() => {
+                        const participationPct = s.mep.participation_pct;
+                        const hasAbsent = participationPct !== undefined && participationPct < 100;
+                        const absentPct = hasAbsent ? 100 - participationPct : 0;
+                        const activePct = 100 - absentPct;
 
-                    {/* Red connector arrow when expanded */}
-                    {isExpanded && (
-                      <div className="flex justify-end pr-2 -mb-2">
-                        <svg width="20" height="16" viewBox="0 0 20 16" className="text-red-500">
-                          <path d="M10 0 L10 10 L6 6 M10 10 L14 6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </div>
-                    )}
+                        let barTotal: number, barAgainst: number;
+                        if (hasTopicFilter) {
+                          barTotal = s.topicVoteCount;
+                          barAgainst = filteredCount;
+                        } else {
+                          barTotal = s.mep.n_votes;
+                          barAgainst = s.mep.n_votes_against_group;
+                        }
+
+                        const loyalPct = barTotal > 0 ? ((barTotal - barAgainst) / barTotal) * activePct : activePct;
+                        const againstPct = barTotal > 0 ? (barAgainst / barTotal) * activePct : 0;
+                        // Center of the red segment
+                        const arrowLeft = loyalPct + againstPct / 2;
+
+                        return (
+                          <>
+                            {hasTopicFilter ? (
+                              <LoyaltyBar
+                                loyalty={s.topicVoteCount > 0 ? ((s.topicVoteCount - filteredCount) / s.topicVoteCount) * 100 : 100}
+                                against={filteredCount}
+                                total={s.topicVoteCount}
+                                participationPct={participationPct}
+                              />
+                            ) : (
+                              <LoyaltyBar
+                                loyalty={s.mep.group_loyalty}
+                                against={s.mep.n_votes_against_group}
+                                total={s.mep.n_votes}
+                                participationPct={participationPct}
+                              />
+                            )}
+
+                            {/* Red connector arrow aligned with brud segment */}
+                            {isExpanded && againstPct > 0 && (
+                              <div className="relative h-4 -mb-2">
+                                <svg
+                                  width="20"
+                                  height="16"
+                                  viewBox="0 0 20 16"
+                                  className="text-red-500 absolute"
+                                  style={{ left: `calc(${arrowLeft}% - 10px)` }}
+                                >
+                                  <path d="M10 0 L10 10 L6 6 M10 10 L14 6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
               </button>
