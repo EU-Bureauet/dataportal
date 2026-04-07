@@ -532,7 +532,6 @@ export function DanishMEPVotesChart() {
   // Detail view
   const selectedSummary = selectedMEP ? sorted.find((s) => s.mep.mep_id === selectedMEP) : null;
 
-  const handleSelect = useCallback((mepId: string) => setSelectedMEP(mepId), []);
   const handleClose = useCallback(() => setSelectedMEP(null), []);
   const toggleAccordion = useCallback((mepId: string) => setExpandedMEP((prev) => (prev === mepId ? null : mepId)), []);
 
