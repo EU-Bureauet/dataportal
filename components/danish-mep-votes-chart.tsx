@@ -113,6 +113,22 @@ const GROUP_COLORS: Record<string, string> = {
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
+// ─── Configurable UI labels ──────────────────────────────────────────────────
+// Change these strings to update text across the entire component.
+
+const LABELS = {
+  /** Accordion header when expanded: {name} is replaced with the MEP's family name */
+  accordionHeader: "↓ Brud med gruppen — hvem stemte {name} med?",
+  /** Detail panel: how many breaks */
+  breakCount: "{count} brud med partigruppen",
+  /** Detail panel: ally chart heading */
+  allyHeading: "Hvem stemmer {name} med ved brud?",
+  /** Detail panel: vote list heading */
+  voteListHeading: "Afstemninger hvor {name} brød med {group}",
+  /** No breaks for this topic */
+  noBreaks: "{fullName} har ingen brud med {group} inden for dette emne.",
+} as const;
+
 // ─── Group tooltip badge ─────────────────────────────────────────────────────
 
 function GroupBadge({
@@ -166,7 +182,7 @@ function GroupBadge({
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function LoyaltyBar({ loyalty, against, total, participationPct }: { loyalty: number; against: number; total: number; participationPct?: number }) {
+function LoyaltyBar({ against, total, participationPct }: Readonly<{ against: number; total: number; participationPct?: number }>) {
   // If we have participation data, scale the bar to include absent votes
   const hasAbsent = participationPct !== undefined && participationPct < 100;
   const absentPct = hasAbsent ? 100 - participationPct : 0;
@@ -176,18 +192,11 @@ function LoyaltyBar({ loyalty, against, total, participationPct }: { loyalty: nu
 
   return (
     <div className="w-full">
-      <div className="flex text-xs text-gray-500 mb-1">
-        <span style={{ width: `${loyalPct}%` }} className="truncate">Med gruppen: {(total - against).toLocaleString("da-DK")}</span>
-        <span style={{ width: `${againstPct}%` }} className="text-red-600 font-medium text-center truncate">Brud: {against.toLocaleString("da-DK")}</span>
-        {hasAbsent && (
-          <span style={{ width: `${absentPct}%` }} className="text-gray-400 text-right truncate">Fravær</span>
-        )}
-      </div>
       <div className="w-full h-4 rounded-full bg-gray-100 overflow-hidden flex">
         <div
           className="h-full bg-emerald-500 transition-all duration-500"
           style={{ width: `${loyalPct}%` }}
-          title={`${loyalPct.toFixed(1)}% loyalitet`}
+          title={`${loyalPct.toFixed(1)}% med gruppen`}
         />
         <div
           className="h-full bg-red-500 transition-all duration-500"
@@ -202,11 +211,20 @@ function LoyaltyBar({ loyalty, against, total, participationPct }: { loyalty: nu
           />
         )}
       </div>
+      {/* Percentages aligned to bar segments */}
       <div className="flex text-xs mt-1">
-        <span style={{ width: `${loyalPct}%` }} className="text-emerald-700 font-medium truncate">{loyalPct.toFixed(1)}% loyal</span>
-        <span style={{ width: `${againstPct}%` }} className="text-red-600 font-medium text-center truncate">{againstPct.toFixed(1)}% brud</span>
+        <span style={{ width: `${loyalPct}%` }} className="text-gray-600 truncate">{loyalPct.toFixed(1)}%</span>
+        <span style={{ width: `${againstPct}%` }} className="text-gray-600 text-center truncate">{againstPct.toFixed(1)}%</span>
         {hasAbsent && (
-          <span style={{ width: `${absentPct}%` }} className="text-gray-400 font-medium text-right truncate">{absentPct.toFixed(1)}% fravær</span>
+          <span style={{ minWidth: '2.5rem' }} className="text-gray-400 text-right flex-shrink-0">{absentPct.toFixed(1)}%</span>
+        )}
+      </div>
+      {/* Color legend */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs mt-1">
+        <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" /> Med gruppen</span>
+        <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-500 inline-block" /> Brud</span>
+        {hasAbsent && (
+          <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-gray-300 inline-block" /> Fravær</span>
         )}
       </div>
     </div>
@@ -337,20 +355,20 @@ function MEPDetailPanel({
             {summary.mep.national_party_id.name} ({summary.mep.national_party_id.code}) · {summary.mep.current_group_id.name}
           </p>
           <p className="text-sm text-red-600 font-medium mt-0.5">
-            {list.length} brud med partigruppen{list.length !== summary.totalDisagreements ? ` (af ${summary.totalDisagreements} i alt)` : ""}
+            {LABELS.breakCount.replace("{count}", String(list.length))}{list.length !== summary.totalDisagreements ? ` (af ${summary.totalDisagreements} i alt)` : ""}
           </p>
         </div>
       </div>
 
       {/* Ally chart */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-        <h4 className="text-sm font-semibold text-gray-700 mb-3">Hvem stemmer {summary.mep.family_name} med ved brud?</h4>
+        <h4 className="text-sm font-semibold text-gray-700 mb-3">{LABELS.allyHeading.replace("{name}", summary.mep.family_name)}</h4>
         <AllyBar allies={summary.topAllies} mepGroup={summary.mep.current_group_id.code} groupDescriptions={groupDescriptions} />
       </div>
 
       {/* Vote list */}
       <div>
-        <h4 className="text-sm font-semibold text-gray-700 mb-3">Afstemninger hvor {summary.mep.family_name} brød med {summary.mep.current_group_id.code}</h4>
+        <h4 className="text-sm font-semibold text-gray-700 mb-3">{LABELS.voteListHeading.replace("{name}", summary.mep.family_name).replace("{group}", summary.mep.current_group_id.code)}</h4>
         <div className="divide-y divide-gray-100">
           {visible.map((d) => (
             <VoteRow key={`${d["Vote ID"]}-${d["Vote Description"]}`} d={d} groupCodes={GROUP_CODES} groupDescriptions={groupDescriptions} />
@@ -647,14 +665,12 @@ export function DanishMEPVotesChart() {
                           <>
                             {hasTopicFilter ? (
                               <LoyaltyBar
-                                loyalty={s.topicVoteCount > 0 ? ((s.topicVoteCount - filteredCount) / s.topicVoteCount) * 100 : 100}
                                 against={filteredCount}
                                 total={s.topicVoteCount}
                                 participationPct={participationPct}
                               />
                             ) : (
                               <LoyaltyBar
-                                loyalty={s.mep.group_loyalty}
                                 against={s.mep.n_votes_against_group}
                                 total={s.mep.n_votes}
                                 participationPct={participationPct}
@@ -690,7 +706,7 @@ export function DanishMEPVotesChart() {
                     <>
                       <div className="pt-3 pb-1">
                         <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-3">
-                          ↓ Brud med gruppen &mdash; hvem stemte {s.mep.family_name} med?
+                          {LABELS.accordionHeader.replace("{name}", s.mep.family_name)}
                         </p>
                         <AllyBar allies={s.topAllies} mepGroup={s.mep.current_group_id.code} groupDescriptions={groupDescriptions} />
                       </div>
@@ -708,7 +724,7 @@ export function DanishMEPVotesChart() {
                     </>
                   ) : (
                     <p className="pt-4 text-sm text-gray-500 italic">
-                      {s.mep.full_name} har ingen brud med {s.mep.current_group_id.code} inden for dette emne.
+                      {LABELS.noBreaks.replace("{fullName}", s.mep.full_name).replace("{group}", s.mep.current_group_id.code)}
                     </p>
                   )}
                 </div>
