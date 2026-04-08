@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import useSWR from "swr";
 import { ToggleButton } from "@/components/toggle-button";
 import { GroupTooltip } from "@/components/group-tooltip";
+import { GROUP_COLORS } from "@/lib/group-colors";
 
 interface GroupWin {
   "Group ID": string;
@@ -54,8 +55,6 @@ export function WinningCoalitionColumnChart({
     );
   }
 
-  const colorMap: Record<string, string> = {};
-  for (const g of tooltipsData.groups) colorMap[g.code] = g.color;
   const descMap: Record<string, string> = {};
   for (const g of tooltipsData.groups) if (g.description) descMap[g.code] = g.description;
   const nameMap = namesData.political_group_names;
@@ -156,7 +155,7 @@ export function WinningCoalitionColumnChart({
           {sorted.map((groupId) => {
             const allEntry = allMap.get(groupId);
             const themeEntry = themeMap.get(groupId);
-            const color = colorMap[groupId] ?? "#888";
+            const color = GROUP_COLORS[groupId] ?? "#888";
 
             const allPct = allEntry?.["Win Percentage"] ?? 0;
             const themePct = themeEntry?.["Win Percentage"] ?? 0;
@@ -236,7 +235,7 @@ export function WinningCoalitionColumnChart({
           <GroupTooltip
             name={name}
             code={tooltip.groupId}
-            color={colorMap[tooltip.groupId] ?? "#888"}
+            color={GROUP_COLORS[tooltip.groupId] ?? "#888"}
             description={desc}
             stats={stats}
             x={tooltip.x}

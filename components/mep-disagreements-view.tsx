@@ -5,26 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Card } from "@/components/ui/card";
 import { MEPPartyDisagreements } from "@/types/data";
 import { PARTY_COLORS } from "@/types/data";
+import { GROUP_COLORS } from "@/lib/group-colors";
 
 interface MEPDisagreementsViewProps {
   data: MEPPartyDisagreements;
 }
-
-// EU Parliamentary group colors
-const GROUP_COLORS: { [key: string]: string } = {
-  "PPE": "#3399FF",
-  "S&D": "#FF0000",
-  "Renew": "#FFCC00",
-  "Verts/ALE": "#00CC00",
-  "ECR": "#0066CC",
-  "The Left": "#990000",
-  "ESN": "#000066",
-  "PfE": "#006699",
-  "Greens/EFA": "#00CC00",
-  "PPE-DE": "#3399FF",
-  "AfD": "#000066",
-  "NI": "#999999"
-};
 
 export function MEPDisagreementsView({ data }: MEPDisagreementsViewProps) {
   const router = useRouter();

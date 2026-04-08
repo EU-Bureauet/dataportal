@@ -4,33 +4,11 @@ import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from "@/components/ui/card";
 import { NationalPartyDisagreementsData, extractCountryFromPartyName } from "@/types/data";
+import { GROUP_COLORS } from "@/lib/group-colors";
 
 interface NationalPartyDisagreementsViewProps {
   data: NationalPartyDisagreementsData;
 }
-
-// EU Parliamentary group colors
-const GROUP_COLORS: { [key: string]: string } = {
-  "PPE": "#3399FF",
-  "S&D": "#FF0000",
-  "Renew": "#FFCC00",
-  "Verts/ALE": "#00CC00",
-  "ECR": "#0066CC",
-  "The Left": "#990000",
-  "ESN": "#000066",
-  "PfE": "#006699",
-  "Greens/EFA": "#00CC00",
-  "PPE-DE": "#3399FF",
-  "Group of the European People's Party (Christian Democrats)": "#3399FF",
-  "Progressive Alliance of Socialists and Democrats": "#FF0000",
-  "Renew Europe Group": "#FFCC00",
-  "Greens/European Free Alliance": "#00CC00",
-  "European Conservatives and Reformists Group": "#0066CC",
-  "The Left group in the European Parliament - GUE/NGL": "#990000",
-  "Europe of Sovereign Nations Group": "#000066",
-  "Patriots for Europe Group": "#006699",
-  "NI": "#999999"
-};
 
 export function NationalPartyDisagreementsView({ data }: NationalPartyDisagreementsViewProps) {
   const router = useRouter();

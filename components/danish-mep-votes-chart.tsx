@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { GROUP_COLORS } from "@/lib/group-colors";
 import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
 
 // ─── Local photo helper ──────────────────────────────────────────────────────
@@ -99,18 +100,6 @@ interface MEPSummary {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const GROUP_CODES = ["ECR", "ESN", "NI", "PPE", "PfE", "Renew", "S&D", "The Left", "Verts/ALE"] as const;
-
-const GROUP_COLORS: Record<string, string> = {
-  ECR: "#0E4DA4",
-  ESN: "#1B263B",
-  NI: "#808080",
-  PPE: "#003399",
-  PfE: "#143862",
-  Renew: "#FFD700",
-  "S&D": "#E30613",
-  "The Left": "#8B0000",
-  "Verts/ALE": "#009A44",
-};
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import useSWR from "swr";
 import { ToggleButton } from "@/components/toggle-button";
 import { GroupTooltip } from "@/components/group-tooltip";
+import { GROUP_COLORS } from "@/lib/group-colors";
 
 interface WinningCoalition {
   "Winning Coalition": string[];
@@ -72,8 +73,6 @@ export function FrequentCoalitionsBarChart({
     );
   }
 
-  const colorMap: Record<string, string> = {};
-  for (const g of tooltipsData.groups) colorMap[g.code] = g.color;
   const descMap: Record<string, string> = {};
   for (const g of tooltipsData.groups) if (g.description) descMap[g.code] = g.description;
   const nameMap = namesData.political_group_names;
@@ -177,7 +176,7 @@ export function FrequentCoalitionsBarChart({
                     <span
                       key={code}
                       className="text-[10px] px-1.5 py-0.5 rounded font-medium text-white cursor-pointer"
-                      style={{ backgroundColor: colorMap[code] ?? "#888" }}
+                      style={{ backgroundColor: GROUP_COLORS[code] ?? "#888" }}
                       onMouseEnter={(e) => {
                         const rect = containerRef.current?.getBoundingClientRect();
                         if (!rect) return;
@@ -258,7 +257,7 @@ export function FrequentCoalitionsBarChart({
           <GroupTooltip
             name={name}
             code={code}
-            color={colorMap[code] ?? "#888"}
+            color={GROUP_COLORS[code] ?? "#888"}
             description={desc}
             x={tooltip.x}
             y={tooltip.y}

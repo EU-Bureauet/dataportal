@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import useSWR from "swr";
 import { useSearchParams } from "next/navigation";
+import { GROUP_COLORS } from "@/lib/group-colors";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -25,18 +26,6 @@ interface GroupTooltip {
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-
-const GROUP_COLORS: Record<string, string> = {
-  ECR: "#0E4DA4",
-  ESN: "#1B263B",
-  NI: "#808080",
-  PPE: "#003399",
-  PfE: "#143862",
-  Renew: "#FFD700",
-  "S&D": "#E30613",
-  "The Left": "#8B0000",
-  "Verts/ALE": "#009A44",
-};
 
 const GROUP_ORDER = ["The Left", "Verts/ALE", "S&D", "Renew", "PPE", "ECR", "PfE", "ESN", "NI"];
 

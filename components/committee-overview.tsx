@@ -5,28 +5,13 @@ import { useRouter } from 'next/navigation';
 import { Card } from "@/components/ui/card";
 import { CommitteeMetadata, type CommitteeAndGroupNames } from "@/types/data";
 import committeeNamesData from "@/data/committee_and_group_names.json";
+import { GROUP_COLORS } from "@/lib/group-colors";
 
 const committeeNames = committeeNamesData as CommitteeAndGroupNames;
 
 interface CommitteeOverviewProps {
   data: CommitteeMetadata;
 }
-
-// EU Parliamentary group colors
-const GROUP_COLORS: { [key: string]: string } = {
-  "PPE": "#3399FF",
-  "S&D": "#FF0000",
-  "Renew": "#FFCC00",
-  "Verts/ALE": "#00CC00",
-  "ECR": "#0066CC",
-  "The Left": "#990000",
-  "ESN": "#000066",
-  "PfE": "#006699",
-  "Greens/EFA": "#00CC00",
-  "PPE-DE": "#3399FF",
-  "AfD": "#000066",
-  "NI": "#999999"
-};
 
 // List of all committees
 const ALL_COMMITTEES = [

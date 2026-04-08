@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import * as d3 from "d3";
 import useSWR from "swr";
+import { GROUP_COLORS } from "@/lib/group-colors";
 
 interface GroupInfo {
   code: string;
@@ -56,7 +57,7 @@ function buildGroups(meps: MEPData[], config: GroupConfig[]): GroupInfo[] {
       name: officialNames[cfg.code] || cfg.code,
       description: cfg.description,
       seats: seatCounts[cfg.code],
-      color: cfg.color,
+      color: GROUP_COLORS[cfg.code] ?? cfg.color,
     }));
 }
 
