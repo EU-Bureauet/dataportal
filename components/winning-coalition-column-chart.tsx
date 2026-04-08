@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import useSWR from "swr";
 import { ToggleButton } from "@/components/toggle-button";
+import { GroupTooltip } from "@/components/group-tooltip";
 
 interface GroupWin {
   "Group ID": string;
@@ -13,10 +14,15 @@ interface GroupWin {
 interface GroupConfig {
   code: string;
   color: string;
+  description?: string;
 }
 
 interface GroupTooltipsFile {
   groups: GroupConfig[];
+}
+
+interface GroupNamesFile {
+  political_group_names: Record<string, string>;
 }
 
 interface GroupWinsFile {
@@ -33,11 +39,14 @@ export function WinningCoalitionColumnChart({
 
   const { data: winsData } = useSWR<GroupWinsFile>(`${basePath}/data/All_Group_wins.json`, fetcher);
   const { data: tooltipsData } = useSWR<GroupTooltipsFile>(`${basePath}/data/group-tooltips.json`, fetcher);
+  const { data: namesData } = useSWR<GroupNamesFile>(`${basePath}/data/committee_and_group_names.json`, fetcher);
 
   const [showTheme, setShowTheme] = useState(true);
   const [showAll, setShowAll] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [tooltip, setTooltip] = useState<{ groupId: string; x: number; y: number } | null>(null);
 
-  if (!winsData || !tooltipsData) {
+  if (!winsData || !tooltipsData || !namesData) {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="w-6 h-6 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
@@ -47,6 +56,9 @@ export function WinningCoalitionColumnChart({
 
   const colorMap: Record<string, string> = {};
   for (const g of tooltipsData.groups) colorMap[g.code] = g.color;
+  const descMap: Record<string, string> = {};
+  for (const g of tooltipsData.groups) if (g.description) descMap[g.code] = g.description;
+  const nameMap = namesData.political_group_names;
 
   // Theme-specific data (foreground) — committee flat array
   const committeeRaw = committee ? winsData[committee] : null;
@@ -88,7 +100,7 @@ export function WinningCoalitionColumnChart({
   const themeName = themeLabel ?? committee ?? "Tema";
 
   return (
-    <div>
+    <div ref={containerRef} className="relative">
       <h3 className="text-sm font-semibold text-gray-700 mb-3">Del af vindende koalition</h3>
 
       {/* Toggle buttons */}
@@ -154,12 +166,22 @@ export function WinningCoalitionColumnChart({
             const containerHeight = Math.max(allHeight, themeHeight, 1);
 
             return (
-              <div key={groupId} className="flex-1 h-full flex items-end">
+              <div
+                key={groupId}
+                className="flex-1 h-full flex items-end cursor-pointer"
+                onMouseEnter={(e) => {
+                  const rect = containerRef.current?.getBoundingClientRect();
+                  if (!rect) return;
+                  const el = e.currentTarget.getBoundingClientRect();
+                  setTooltip({ groupId, x: el.left + el.width / 2 - rect.left, y: el.top - rect.top });
+                }}
+                onMouseLeave={() => setTooltip(null)}
+              >
                 <div className="w-full relative" style={{ height: `${containerHeight}%` }}>
                   {/* Shadow bar — alle temaer */}
                   {showAll && (
                     <div
-                      className="absolute bottom-0 rounded-t-md transition-all duration-500"
+                      className="absolute bottom-0 rounded-t-md transition-all duration-700 ease-in-out"
                       style={{
                         height: `${allHeight > 0 ? (allHeight / containerHeight) * 100 : 0}%`,
                         backgroundColor: color,
@@ -173,7 +195,7 @@ export function WinningCoalitionColumnChart({
                   {/* Foreground bar — theme-specific */}
                   {hasTheme && showTheme && themeEntry && (
                     <div
-                      className="absolute bottom-0 rounded-t-md transition-all duration-500"
+                      className="absolute bottom-0 rounded-t-md transition-all duration-700 ease-in-out"
                       style={{
                         height: `${themeHeight > 0 ? (themeHeight / containerHeight) * 100 : 0}%`,
                         backgroundColor: color,
@@ -202,6 +224,27 @@ export function WinningCoalitionColumnChart({
       <p className="text-xs text-gray-400 mt-3">
         Andel af afstemninger hvor gruppen er del af den vindende side
       </p>
+      {tooltip && (() => {
+        const name = nameMap[tooltip.groupId] ?? tooltip.groupId;
+        const desc = descMap[tooltip.groupId];
+        const allEntry = allMap.get(tooltip.groupId);
+        const themeEntry = themeMap.get(tooltip.groupId);
+        const stats: { label: string; value: string }[] = [];
+        if (hasTheme && themeEntry) stats.push({ label: themeName, value: `${themeEntry["Win Percentage"].toFixed(1)}%` });
+        if (allEntry) stats.push({ label: "Alle temaer", value: `${allEntry["Win Percentage"].toFixed(1)}%` });
+        return (
+          <GroupTooltip
+            name={name}
+            code={tooltip.groupId}
+            color={colorMap[tooltip.groupId] ?? "#888"}
+            description={desc}
+            stats={stats}
+            x={tooltip.x}
+            y={tooltip.y}
+            containerWidth={containerRef.current?.clientWidth ?? 400}
+          />
+        );
+      })()}
     </div>
   );
 }

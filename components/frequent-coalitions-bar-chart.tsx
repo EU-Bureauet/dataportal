@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import useSWR from "swr";
 import { ToggleButton } from "@/components/toggle-button";
+import { GroupTooltip } from "@/components/group-tooltip";
 
 interface WinningCoalition {
   "Winning Coalition": string[];
@@ -13,10 +14,15 @@ interface WinningCoalition {
 interface GroupConfig {
   code: string;
   color: string;
+  description?: string;
 }
 
 interface GroupTooltipsFile {
   groups: GroupConfig[];
+}
+
+interface GroupNamesFile {
+  political_group_names: Record<string, string>;
 }
 
 interface WinningCoalitionsFile {
@@ -48,11 +54,17 @@ export function FrequentCoalitionsBarChart({
     `${basePath}/data/group-tooltips.json`,
     fetcher
   );
+  const { data: namesData } = useSWR<GroupNamesFile>(
+    `${basePath}/data/committee_and_group_names.json`,
+    fetcher
+  );
 
   const [showTheme, setShowTheme] = useState(true);
   const [showAll, setShowAll] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [tooltip, setTooltip] = useState<{ groupCode: string; x: number; y: number } | null>(null);
 
-  if (!coalData || !tooltipsData) {
+  if (!coalData || !tooltipsData || !namesData) {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="w-6 h-6 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
@@ -62,6 +74,9 @@ export function FrequentCoalitionsBarChart({
 
   const colorMap: Record<string, string> = {};
   for (const g of tooltipsData.groups) colorMap[g.code] = g.color;
+  const descMap: Record<string, string> = {};
+  for (const g of tooltipsData.groups) if (g.description) descMap[g.code] = g.description;
+  const nameMap = namesData.political_group_names;
 
   // Theme-specific data (foreground) — committee flat array
   const committeeRaw = committee ? coalData[committee] : null;
@@ -82,9 +97,15 @@ export function FrequentCoalitionsBarChart({
   const allMap = new Map(allCoalitions.map((c) => [coalitionKey(c["Winning Coalition"]), c]));
 
   // Use the primary visible list to determine top-N and order
-  // Always use the same list so the chart doesn't re-sort on toggle
+  // Re-sort dynamically based on which toggle is active
   const primaryList = hasTheme ? themeCoalitions : allCoalitions;
-  const top = [...primaryList].sort((a, b) => b.Count - a.Count).slice(0, MAX_ROWS);
+  const top = [...primaryList].sort((a, b) => {
+    const aKey = coalitionKey(a["Winning Coalition"]);
+    const bKey = coalitionKey(b["Winning Coalition"]);
+    const aPct = (hasTheme && showTheme ? themeMap.get(aKey)?.Percentage : 0) || (showAll ? allMap.get(aKey)?.Percentage ?? 0 : 0);
+    const bPct = (hasTheme && showTheme ? themeMap.get(bKey)?.Percentage : 0) || (showAll ? allMap.get(bKey)?.Percentage ?? 0 : 0);
+    return bPct - aPct;
+  }).slice(0, MAX_ROWS);
 
   // Compute maxPct from all data so the scale never changes on toggle
   const allPctValues = [
@@ -95,12 +116,13 @@ export function FrequentCoalitionsBarChart({
 
   // Round axis max up to next multiple of 10 for clean ticks
   const axisMax = Math.ceil(maxPct / 10) * 10;
-  const xTicks = Array.from({ length: axisMax / 10 + 1 }, (_, i) => i * 10);
+  const gridTicks = Array.from({ length: axisMax / 2 + 1 }, (_, i) => i * 2);
+  const labelTicks = Array.from({ length: axisMax / 10 + 1 }, (_, i) => i * 10);
 
   const themeName = themeLabel ?? committee ?? "Tema";
 
   return (
-    <div>
+    <div ref={containerRef} className="relative">
       <h3 className="text-sm font-semibold text-gray-700 mb-3">Hyppigste koalitioner</h3>
       <p className="text-xs text-gray-500 mb-4 -mt-2">Top {MAX_ROWS} mest hyppige gruppekombinationer på den vindende side</p>
 
@@ -113,12 +135,17 @@ export function FrequentCoalitionsBarChart({
       )}
 
       {/* Chart with vertical grid */}
-      <div className="relative">
+      <div className="relative flex">
+        {/* Y-axis label */}
+        <div className="relative flex-shrink-0" style={{ width: "1.4rem" }}>
+          <span className="absolute -left-11 top-1/2 -translate-y-1/2 -rotate-90 text-[10px] text-gray-400 font-medium whitespace-nowrap origin-center">Gruppekombination</span>
+        </div>
+        <div className="relative flex-1">
         {/* Vertical grid lines spanning the full bar area */}
-        <div className="absolute inset-0 pointer-events-none" style={{ right: "4.5rem" }}>
-          {xTicks.map((tick) => {
+        <div className="absolute inset-0 pointer-events-none" style={{ right: "4.5rem", bottom: "2.5rem" }}>
+          {gridTicks.map((tick) => {
             const pos = (tick / axisMax) * 100;
-            const isMajor = tick % 20 === 0;
+            const isMajor = tick % 10 === 0;
             return (
               <div
                 key={tick}
@@ -149,8 +176,15 @@ export function FrequentCoalitionsBarChart({
                   {c["Winning Coalition"].map((code) => (
                     <span
                       key={code}
-                      className="text-[10px] px-1.5 py-0.5 rounded font-medium text-white"
+                      className="text-[10px] px-1.5 py-0.5 rounded font-medium text-white cursor-pointer"
                       style={{ backgroundColor: colorMap[code] ?? "#888" }}
+                      onMouseEnter={(e) => {
+                        const rect = containerRef.current?.getBoundingClientRect();
+                        if (!rect) return;
+                        const el = e.currentTarget.getBoundingClientRect();
+                        setTooltip({ groupCode: code, x: el.left + el.width / 2 - rect.left, y: el.top - rect.top });
+                      }}
+                      onMouseLeave={() => setTooltip(null)}
                     >
                       {code}
                     </span>
@@ -162,7 +196,7 @@ export function FrequentCoalitionsBarChart({
                     {/* Shadow bar — alle temaer */}
                     {showAll && (
                       <div
-                        className="absolute rounded-sm bg-blue-400 transition-all duration-500"
+                        className="absolute rounded-sm bg-blue-400 transition-all duration-700 ease-in-out"
                         style={{
                           width: `${allWidth}%`,
                           top: hasTheme ? "4px" : "0",
@@ -177,7 +211,7 @@ export function FrequentCoalitionsBarChart({
                     {/* Foreground bar — theme-specific */}
                     {hasTheme && showTheme && themeEntry && (
                       <div
-                        className="absolute rounded-sm bg-blue-600 transition-all duration-500"
+                        className="absolute rounded-sm bg-blue-600 transition-all duration-700 ease-in-out"
                         style={{ width: `${themeWidth}%`, top: "0", height: "20px" }}
                         title={`${themeName}: ${themePct.toFixed(1)}%`}
                       />
@@ -194,7 +228,7 @@ export function FrequentCoalitionsBarChart({
 
         {/* X-axis tick labels */}
         <div className="relative mt-2" style={{ marginRight: "4.5rem" }}>
-          {xTicks.map((tick) => {
+          {labelTicks.map((tick) => {
             const pos = (tick / axisMax) * 100;
             return (
               <div
@@ -210,11 +244,28 @@ export function FrequentCoalitionsBarChart({
             );
           })}
         </div>
-        <p className="text-[10px] text-gray-400 text-center mt-8 relative z-10" style={{ marginRight: "4.5rem" }}><span className="bg-white px-2">Andel af afstemninger (%)</span></p>
+        <p className="text-[10px] text-gray-400 text-center mt-10 relative z-10" style={{ marginRight: "4.5rem" }}><span className="bg-white px-2">Andel af afstemninger (%)</span></p>
+        </div>
       </div>
       <p className="text-xs text-gray-400 mt-6">
         Koalitionskombinationer sorteret efter hyppighed
       </p>
+      {tooltip && (() => {
+        const code = tooltip.groupCode;
+        const name = nameMap[code] ?? code;
+        const desc = descMap[code];
+        return (
+          <GroupTooltip
+            name={name}
+            code={code}
+            color={colorMap[code] ?? "#888"}
+            description={desc}
+            x={tooltip.x}
+            y={tooltip.y}
+            containerWidth={containerRef.current?.clientWidth ?? 400}
+          />
+        );
+      })()}
     </div>
   );
 }
