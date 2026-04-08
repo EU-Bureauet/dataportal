@@ -89,7 +89,7 @@ export function FrequentCoalitionsBarChart({
     ? totalRaw.total_coalitions
     : [];
 
-  const hasTheme = committee && themeCoalitions.length > 0;
+  const hasTheme = !!committee;
 
   // Build lookups
   const themeMap = new Map(themeCoalitions.map((c) => [coalitionKey(c["Winning Coalition"]), c]));

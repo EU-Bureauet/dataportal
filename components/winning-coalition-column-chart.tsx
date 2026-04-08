@@ -71,7 +71,7 @@ export function WinningCoalitionColumnChart({
     ? totalRaw.total_group_wins
     : [];
 
-  const hasTheme = committee && themeGroups.length > 0;
+  const hasTheme = !!committee;
 
   const themeMap = new Map(themeGroups.map((g) => [g["Group ID"], g]));
   const allMap = new Map(allGroups.map((g) => [g["Group ID"], g]));
