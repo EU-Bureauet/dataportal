@@ -32,12 +32,12 @@ function CoalitionsContent() {
           Udforsk hvilke politiske grupper der oftest stemmer sammen.
         </p>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <FrequentCoalitionsBarChart committee={committee} themeLabel={themeLabel} />
-        </div>
+      <div className="space-y-8">
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <WinningCoalitionColumnChart committee={committee} themeLabel={themeLabel} />
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <FrequentCoalitionsBarChart committee={committee} themeLabel={themeLabel} />
         </div>
       </div>
     </div>
