@@ -195,12 +195,12 @@ export function FrequentCoalitionsBarChart({
                     {/* Shadow bar — alle temaer */}
                     {showAll && (
                       <div
-                        className="absolute rounded-sm bg-blue-400 transition-all duration-700 ease-in-out"
+                        className="absolute rounded-r-sm bg-blue-400 transition-all duration-700 ease-in-out"
                         style={{
                           width: `${allWidth}%`,
                           top: hasTheme ? "4px" : "0",
                           bottom: "0",
-                          left: hasTheme ? "3px" : "0",
+                          left: "0",
                           height: hasTheme ? undefined : "20px",
                           opacity: hasTheme ? 0.3 : 0.7,
                         }}
@@ -210,7 +210,7 @@ export function FrequentCoalitionsBarChart({
                     {/* Foreground bar — theme-specific */}
                     {hasTheme && showTheme && themeEntry && (
                       <div
-                        className="absolute rounded-sm bg-blue-600 transition-all duration-700 ease-in-out"
+                        className="absolute rounded-r-sm bg-blue-600 transition-all duration-700 ease-in-out"
                         style={{ width: `${themeWidth}%`, top: "0", height: "20px" }}
                         title={`${themeName}: ${themePct.toFixed(1)}%`}
                       />
