@@ -267,7 +267,7 @@ function VoteRow({ d, groupCodes, groupDescriptions }: { d: Disagreement; groupC
 
   return (
     <div className="py-3 border-b border-gray-100 last:border-0">
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-3 flex-wrap sm:flex-nowrap">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-900 line-clamp-2">
             {hasLink ? (
@@ -415,7 +415,6 @@ export function DanishMEPVotesChart() {
 
   const [selectedMEP, setSelectedMEP] = useState<string | null>(null);
   const [expandedMEP, setExpandedMEP] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<"name" | "participation" | "breaks">("breaks");
 
   // Build a map of vote_id → eurovoc keywords for topic filtering
   const voteTopicMap = useMemo(() => {
@@ -505,18 +504,10 @@ export function DanishMEPVotesChart() {
     });
   }, [mepData, brudData, voteTopicMap, searchFilter, eurovocFilter, topicVoteIds]);
 
-  // Sort
+  // Sort by most breaks
   const sorted = useMemo(() => {
-    const arr = [...summaries];
-    switch (sortBy) {
-      case "name":
-        return arr.sort((a, b) => a.mep.family_name.localeCompare(b.mep.family_name, "da"));
-      case "participation":
-        return arr.sort((a, b) => b.mep.n_votes - a.mep.n_votes);
-      case "breaks":
-        return arr.sort((a, b) => b.filteredDisagreements.length - a.filteredDisagreements.length);
-    }
-  }, [summaries, sortBy]);
+    return [...summaries].sort((a, b) => b.filteredDisagreements.length - a.filteredDisagreements.length);
+  }, [summaries]);
 
   // Detail view
   const selectedSummary = selectedMEP ? sorted.find((s) => s.mep.mep_id === selectedMEP) : null;
@@ -556,20 +547,12 @@ export function DanishMEPVotesChart() {
         </div>
       )}
 
-      {/* Sort controls */}
+      {/* Sort indicator */}
       <div className="flex items-center gap-2 mb-6">
-        <span className="text-sm text-gray-500">Sortér:</span>
-        {(["breaks", "participation", "name"] as const).map((key) => (
-          <button
-            key={key}
-            onClick={() => setSortBy(key)}
-            className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors cursor-pointer ${
-              sortBy === key ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            {key === "breaks" ? "Flest brud" : key === "participation" ? "Flest stemmer" : "Navn"}
-          </button>
-        ))}
+        <span className="text-sm text-gray-500">Sorteret efter:</span>
+        <span className="text-xs px-3 py-1.5 rounded-full font-medium bg-blue-600 text-white">
+          Flest brud
+        </span>
       </div>
 
       {/* MEP cards */}
