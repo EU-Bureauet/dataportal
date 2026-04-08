@@ -29,15 +29,15 @@ function CoalitionsContent() {
           Koalitioner og alliancer{themeLabel ? `: ${themeLabel}` : ""}
         </h1>
         <p className="text-gray-600 mt-1 max-w-4xl leading-snug text-sm sm:text-base">
-          Udforsk hvilke politiske grupper der oftest stemmer sammen — og hvordan alliancerne skifter fra emne til emne.
+          Udforsk hvilke politiske grupper der oftest stemmer sammen.
         </p>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <WinningCoalitionColumnChart committee={committee} themeLabel={themeLabel} />
+          <FrequentCoalitionsBarChart committee={committee} themeLabel={themeLabel} />
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <FrequentCoalitionsBarChart committee={committee} themeLabel={themeLabel} />
+          <WinningCoalitionColumnChart committee={committee} themeLabel={themeLabel} />
         </div>
       </div>
     </div>

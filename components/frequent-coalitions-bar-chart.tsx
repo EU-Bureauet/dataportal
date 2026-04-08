@@ -82,14 +82,16 @@ export function FrequentCoalitionsBarChart({
   const allMap = new Map(allCoalitions.map((c) => [coalitionKey(c["Winning Coalition"]), c]));
 
   // Use the primary visible list to determine top-N and order
-  const primaryList = hasTheme && showTheme ? themeCoalitions : allCoalitions;
+  // Always use the same list so the chart doesn't re-sort on toggle
+  const primaryList = hasTheme ? themeCoalitions : allCoalitions;
   const top = [...primaryList].sort((a, b) => b.Count - a.Count).slice(0, MAX_ROWS);
 
-  const maxPct = Math.max(
-    ...top.map((c) => allMap.get(coalitionKey(c["Winning Coalition"]))?.Percentage ?? 0),
-    ...top.map((c) => themeMap.get(coalitionKey(c["Winning Coalition"]))?.Percentage ?? 0),
-    1
-  );
+  // Compute maxPct from all data so the scale never changes on toggle
+  const allPctValues = [
+    ...allCoalitions.map((c) => c.Percentage),
+    ...themeCoalitions.map((c) => c.Percentage),
+  ];
+  const maxPct = Math.max(...allPctValues, 1);
 
   // Round axis max up to next multiple of 10 for clean ticks
   const axisMax = Math.ceil(maxPct / 10) * 10;
@@ -100,6 +102,7 @@ export function FrequentCoalitionsBarChart({
   return (
     <div>
       <h3 className="text-sm font-semibold text-gray-700 mb-3">Hyppigste koalitioner</h3>
+      <p className="text-xs text-gray-500 mb-4 -mt-2">Top {MAX_ROWS} mest hyppige gruppekombinationer på den vindende side</p>
 
       {/* Toggle buttons */}
       {hasTheme && (
@@ -159,7 +162,7 @@ export function FrequentCoalitionsBarChart({
                     {/* Shadow bar — alle temaer */}
                     {showAll && (
                       <div
-                        className="absolute rounded-full bg-blue-400 transition-all duration-500"
+                        className="absolute rounded-sm bg-blue-400 transition-all duration-500"
                         style={{
                           width: `${allWidth}%`,
                           top: hasTheme ? "4px" : "0",
@@ -174,7 +177,7 @@ export function FrequentCoalitionsBarChart({
                     {/* Foreground bar — theme-specific */}
                     {hasTheme && showTheme && themeEntry && (
                       <div
-                        className="absolute rounded-full bg-blue-600 transition-all duration-500"
+                        className="absolute rounded-sm bg-blue-600 transition-all duration-500"
                         style={{ width: `${themeWidth}%`, top: "0", height: "20px" }}
                         title={`${themeName}: ${themePct.toFixed(1)}%`}
                       />
@@ -193,26 +196,24 @@ export function FrequentCoalitionsBarChart({
         <div className="relative mt-2" style={{ marginRight: "4.5rem" }}>
           {xTicks.map((tick) => {
             const pos = (tick / axisMax) * 100;
-            const showLabel = tick % 20 === 0;
             return (
               <div
                 key={tick}
                 className="absolute flex flex-col items-center"
                 style={{ left: `${pos}%`, transform: "translateX(-50%)" }}
               >
-                <span className={`block border-l border-gray-400 ${showLabel ? "h-2" : "h-1.5"}`} />
-                {showLabel && (
-                  <span className="text-[11px] font-medium text-gray-500 tabular-nums mt-0.5">
-                    {tick}%
-                  </span>
-                )}
+                <span className="block border-l border-gray-400 h-2" />
+                <span className="text-[11px] font-medium text-gray-500 tabular-nums mt-0.5">
+                  {tick}%
+                </span>
               </div>
             );
           })}
         </div>
+        <p className="text-[10px] text-gray-400 text-center mt-8 relative z-10" style={{ marginRight: "4.5rem" }}><span className="bg-white px-2">Andel af afstemninger (%)</span></p>
       </div>
-      <p className="text-xs text-gray-400 mt-3">
-        De mest hyppige gruppekombinationer på den vindende side
+      <p className="text-xs text-gray-400 mt-6">
+        Koalitionskombinationer sorteret efter hyppighed
       </p>
     </div>
   );

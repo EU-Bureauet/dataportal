@@ -102,7 +102,10 @@ export function WinningCoalitionColumnChart({
       {/* Chart area: Y-axis + bars */}
       <div className="flex" style={{ height: "13rem" }}>
         {/* Y-axis with tick marks */}
-        <div className="relative flex-shrink-0" style={{ width: "3.2rem" }}>
+        <div className="relative flex-shrink-0" style={{ width: "1.6rem" }}>
+          <span className="absolute -left-10 top-1/2 -translate-y-1/2 -rotate-90 text-[10px] text-gray-400 font-medium whitespace-nowrap origin-center">Andel vindende (%)</span>
+        </div>
+        <div className="relative flex-shrink-0" style={{ width: "2.2rem" }}>
           {yTicks.map((tick) => {
             const pos = (tick / axisMax) * 100;
             const showLabel = tick % 20 === 0;
@@ -188,13 +191,14 @@ export function WinningCoalitionColumnChart({
       </div>
 
       {/* X-axis labels */}
-      <div className="flex gap-2 mt-1" style={{ paddingLeft: "3.2rem" }}>
+      <div className="flex gap-2 mt-1" style={{ paddingLeft: "3.8rem" }}>
         {sorted.map((groupId) => (
           <span key={groupId} className="flex-1 text-xs font-medium text-gray-500 text-center truncate">
             {groupId}
           </span>
         ))}
       </div>
+      <p className="text-[10px] text-gray-400 text-center mt-1" style={{ paddingLeft: "3.8rem" }}>Politisk gruppe</p>
       <p className="text-xs text-gray-400 mt-3">
         Andel af afstemninger hvor gruppen er del af den vindende side
       </p>
