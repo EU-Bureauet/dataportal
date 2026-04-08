@@ -19,9 +19,9 @@ const navigationLinks = [
 ];
 
 const themeLinks = [
-  { href: '/tema/forsvar', label: 'Forsvar' },
-  { href: '/tema/klima', label: 'Klima' },
-  { href: '/tema/migration', label: 'Migration' },
+  { href: '/tema/forsvar', label: 'Forsvar og sikkerhed' },
+  { href: '/tema/miljoe', label: 'Miljø og sundhed' },
+  { href: '/tema/energi', label: 'Energi og industri' },
 ];
 
 export function NavigationHeader() {

@@ -138,7 +138,7 @@ export function WinningCoalitionColumnChart({
         </div>
 
         {/* Bars area */}
-        <div className="flex items-end gap-2 flex-1 relative">
+        <div className="flex items-end gap-4 flex-1 relative px-2">
           {/* Horizontal grid lines at every 10% */}
           {yTicks.map((tick) => {
             const pos = (tick / axisMax) * 100;
@@ -167,7 +167,7 @@ export function WinningCoalitionColumnChart({
             return (
               <div
                 key={groupId}
-                className="flex-1 h-full flex items-end cursor-pointer"
+                className="flex-1 h-full flex items-end justify-center cursor-pointer"
                 onMouseEnter={(e) => {
                   const rect = containerRef.current?.getBoundingClientRect();
                   if (!rect) return;
@@ -176,7 +176,7 @@ export function WinningCoalitionColumnChart({
                 }}
                 onMouseLeave={() => setTooltip(null)}
               >
-                <div className="w-full relative" style={{ height: `${containerHeight}%` }}>
+                <div className="w-3/4 relative" style={{ height: `${containerHeight}%` }}>
                   {/* Shadow bar — alle temaer */}
                   {showAll && (
                     <div
@@ -212,7 +212,7 @@ export function WinningCoalitionColumnChart({
       </div>
 
       {/* X-axis labels */}
-      <div className="flex gap-2 mt-1" style={{ paddingLeft: "3.8rem" }}>
+      <div className="flex gap-4 mt-1 px-2" style={{ paddingLeft: "calc(3.8rem + 0.5rem)" }}>
         {sorted.map((groupId) => (
           <span key={groupId} className="flex-1 text-xs font-medium text-gray-500 text-center truncate">
             {groupId}

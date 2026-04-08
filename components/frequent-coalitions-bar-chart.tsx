@@ -197,9 +197,9 @@ export function FrequentCoalitionsBarChart({
                         className="absolute rounded-r-sm bg-blue-400 transition-all duration-700 ease-in-out"
                         style={{
                           width: `${allWidth}%`,
-                          top: hasTheme ? "7px" : "0",
+                          top: hasTheme ? "10px" : "0",
                           left: "0",
-                          height: hasTheme ? "16px" : "20px",
+                          height: hasTheme ? "20px" : "22px",
                           opacity: hasTheme ? 0.3 : 0.7,
                         }}
                         title={`Alle temaer: ${allPct.toFixed(1)}%`}
@@ -209,7 +209,7 @@ export function FrequentCoalitionsBarChart({
                     {hasTheme && showTheme && themeEntry && (
                       <div
                         className="absolute rounded-r-sm bg-blue-600 transition-all duration-700 ease-in-out"
-                        style={{ width: `${themeWidth}%`, top: "0", height: "16px" }}
+                        style={{ width: `${themeWidth}%`, top: "0", height: "20px" }}
                         title={`${themeName}: ${themePct.toFixed(1)}%`}
                       />
                     )}
