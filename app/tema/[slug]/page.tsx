@@ -39,6 +39,7 @@ interface ThemeData {
   title: string;
   subtitle?: string;
   heroImage: string;
+  published?: boolean;
   articleFilter: ThemeArticleFilter;
   visualisations: ThemeVisualisation[];
 }
@@ -174,7 +175,12 @@ function generateSubDescription(vis: ThemeVisualisation): string | undefined {
 }
 
 export function generateStaticParams() {
-  return getThemeSlugs().map((slug) => ({ slug }));
+  return getThemeSlugs()
+    .filter((slug) => {
+      const theme = getThemeData(slug);
+      return theme?.published === true;
+    })
+    .map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
@@ -189,7 +195,7 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
   const { slug } = await params;
   const theme = getThemeData(slug);
 
-  if (!theme) {
+  if (!theme || theme.published !== true) {
     notFound();
   }
 

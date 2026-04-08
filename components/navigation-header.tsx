@@ -3,6 +3,9 @@
 import { useState, Fragment } from 'react';
 import Link from 'next/link';
 import { EUBureauetLogo } from './eu-bureauet-logo.tsx';
+import forsvarTheme from '@/data/themes/forsvar.json';
+import miljoeTheme from '@/data/themes/miljoe.json';
+import energiTheme from '@/data/themes/energi.json';
 
 const navigationLinks = [
   { href: '/', label: 'Dataportal' },
@@ -18,11 +21,13 @@ const navigationLinks = [
   { href: '/national-party-disagreements', label: 'Partiuenigheder' },
 ];
 
-const themeLinks = [
-  { href: '/tema/forsvar', label: 'Forsvar og sikkerhed' },
-  { href: '/tema/miljoe', label: 'Miljø og sundhed' },
-  { href: '/tema/energi', label: 'Energi og industri' },
+const allThemeLinks = [
+  { href: `/tema/${forsvarTheme.slug}`, label: forsvarTheme.title, published: forsvarTheme.published },
+  { href: `/tema/${miljoeTheme.slug}`, label: miljoeTheme.title, published: miljoeTheme.published },
+  { href: `/tema/${energiTheme.slug}`, label: energiTheme.title, published: energiTheme.published },
 ];
+
+const themeLinks = allThemeLinks.filter((t) => t.published === true);
 
 export function NavigationHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -87,7 +92,7 @@ export function NavigationHeader() {
                       {link.label}
                     </Link>
                   </li>
-                  {index === 0 && (
+                  {index === 0 && themeLinks.length > 0 && (
                     <>
                       <li>
                         <span className="block px-6 py-2 text-sm font-semibold text-gray-500 uppercase tracking-wide">

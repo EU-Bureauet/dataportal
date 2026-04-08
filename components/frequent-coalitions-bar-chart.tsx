@@ -136,12 +136,12 @@ export function FrequentCoalitionsBarChart({
       {/* Chart with vertical grid */}
       <div className="relative flex">
         {/* Y-axis label */}
-        <div className="relative flex-shrink-0" style={{ width: "1.4rem" }}>
+        <div className="relative flex-shrink-0 hidden sm:block" style={{ width: "1.4rem" }}>
           <span className="absolute -left-11 top-1/2 -translate-y-1/2 -rotate-90 text-[10px] text-gray-400 font-medium whitespace-nowrap origin-center">Gruppekombination</span>
         </div>
         <div className="relative flex-1 min-h-[12rem]">
         {/* Vertical grid lines spanning the full bar area */}
-        <div className="absolute inset-0 pointer-events-none" style={{ left: "10.75rem", right: "4.5rem", bottom: "2.5rem" }}>
+        <div className="absolute inset-0 pointer-events-none hidden sm:block" style={{ left: "10.75rem", right: "4.5rem", bottom: "2.5rem" }}>
           {gridTicks.map((tick) => {
             const pos = (tick / axisMax) * 100;
             const isMajor = tick % 10 === 0;
@@ -171,7 +171,7 @@ export function FrequentCoalitionsBarChart({
             return (
               <div key={i} className="flex items-center gap-3">
                 {/* Group labels — left of bar */}
-                <div className="flex flex-wrap gap-1 w-40 flex-shrink-0 justify-end">
+                <div className="flex flex-wrap gap-1 w-16 sm:w-40 flex-shrink-0 justify-end">
                   {c["Winning Coalition"].map((code) => (
                     <span
                       key={code}
@@ -214,7 +214,7 @@ export function FrequentCoalitionsBarChart({
                       />
                     )}
                   </div>
-                  <span className="text-xs font-medium text-gray-600 w-14 text-right flex-shrink-0">
+                  <span className="text-xs font-medium text-gray-600 w-10 sm:w-14 text-right flex-shrink-0">
                     {labelPct.toFixed(1)}%
                   </span>
                 </div>
@@ -224,7 +224,7 @@ export function FrequentCoalitionsBarChart({
         </div>
 
         {/* X-axis tick labels */}
-        <div className="relative mt-2" style={{ marginRight: "4.5rem", marginLeft: "10.75rem" }}>
+        <div className="relative mt-2 hidden sm:block" style={{ marginRight: "4.5rem", marginLeft: "10.75rem" }}>
           {labelTicks.map((tick) => {
             const pos = (tick / axisMax) * 100;
             return (
@@ -241,7 +241,7 @@ export function FrequentCoalitionsBarChart({
             );
           })}
         </div>
-        <p className="text-[10px] text-gray-400 text-center mt-10 relative z-10" style={{ marginRight: "4.5rem", marginLeft: "10.75rem" }}><span className="bg-white px-2">Andel af afstemninger (%)</span></p>
+        <p className="text-[10px] text-gray-400 text-center mt-10 relative z-10 hidden sm:block" style={{ marginRight: "4.5rem", marginLeft: "10.75rem" }}><span className="bg-white px-2">Andel af afstemninger (%)</span></p>
         </div>
       </div>
       <p className="text-xs text-gray-400 mt-6">

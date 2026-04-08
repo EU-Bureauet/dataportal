@@ -180,13 +180,11 @@ export function WinningCoalitionColumnChart({
                   {/* Shadow bar — alle temaer */}
                   {showAll && (
                     <div
-                      className="absolute bottom-0 rounded-t-md transition-all duration-700 ease-in-out"
+                      className={`absolute bottom-0 rounded-t-md transition-all duration-700 ease-in-out ${hasTheme ? "w-[70%] right-0 sm:w-[80%] sm:left-[20%] sm:right-auto" : "left-[10%] right-[10%]"}`}
                       style={{
                         height: `${allHeight > 0 ? (allHeight / containerHeight) * 100 : 0}%`,
                         backgroundColor: color,
                         opacity: hasTheme ? 0.25 : 0.85,
-                        left: hasTheme ? "20%" : "10%",
-                        right: hasTheme ? "0" : "10%",
                       }}
                       title={`${groupId} alle temaer: ${allPct.toFixed(1)}% (${allEntry?.["Win Count"] ?? 0})`}
                     />
@@ -194,12 +192,10 @@ export function WinningCoalitionColumnChart({
                   {/* Foreground bar — theme-specific */}
                   {hasTheme && showTheme && themeEntry && (
                     <div
-                      className="absolute bottom-0 rounded-t-md transition-all duration-700 ease-in-out"
+                      className="absolute bottom-0 rounded-t-md transition-all duration-700 ease-in-out w-[70%] left-0 sm:w-[80%] sm:right-[20%] sm:left-auto"
                       style={{
                         height: `${themeHeight > 0 ? (themeHeight / containerHeight) * 100 : 0}%`,
                         backgroundColor: color,
-                        left: "0",
-                        right: "20%",
                       }}
                       title={`${groupId} ${themeName}: ${themePct.toFixed(1)}% (${themeEntry["Win Count"]})`}
                     />
@@ -212,9 +208,9 @@ export function WinningCoalitionColumnChart({
       </div>
 
       {/* X-axis labels */}
-      <div className="flex gap-4 mt-1 px-2" style={{ paddingLeft: "calc(3.8rem + 0.5rem)" }}>
+      <div className="flex gap-0 sm:gap-4 mt-8 sm:mt-1 px-2 h-14 sm:h-auto overflow-visible pl-[3.3rem] sm:pl-[3.8rem]">
         {sorted.map((groupId) => (
-          <span key={groupId} className="flex-1 text-xs font-medium text-gray-500 text-center truncate">
+          <span key={groupId} className="flex-1 -mx-1 sm:mx-0 text-[10px] sm:text-xs font-medium text-gray-500 text-center sm:truncate sm:rotate-0 -rotate-90 origin-top whitespace-nowrap leading-none flex items-start justify-center pt-1 sm:pt-0 sm:items-center sm:origin-center">
             {groupId}
           </span>
         ))}
