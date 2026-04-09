@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "npx serve out -l 3000",
     "lint": "eslint . && tsc --noemit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "fetch-articles": "node scripts/fetch-articles.mjs",
     "package": "next build && cd out && tar -cf ../build-$(date +%Y-%m-%d-%s).tar.gz *"
   },
@@ -42,6 +44,7 @@
     "eslint-plugin-sonarjs": "^4.0.2",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.7",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.4"
   }
 }

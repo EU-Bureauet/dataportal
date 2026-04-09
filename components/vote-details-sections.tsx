@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { Card } from "@/components/ui/card";
 import { type MEPVote, type RelatedVote, type WinningCoalitionInfo } from "@/types/data";
 import { GROUP_COLORS } from "@/lib/group-colors";
+import { getMajorityLabel, normalizeVoteLabel } from "@/lib/data-transforms";
 import * as flags from 'country-flag-icons/react/3x2';
 
 // Vote type colors
@@ -74,17 +75,6 @@ function VoteBar({ forCount, againstCount, abstentionCount }: {
       </div>
     </div>
   );
-}
-
-function getMajorityLabel(forCount: number, againstCount: number, abstentionCount: number) {
-  const total = forCount + againstCount + abstentionCount;
-  const votes = [
-    { label: 'for', count: forCount, pct: total > 0 ? (forCount / total) * 100 : 0 },
-    { label: 'undlod', count: abstentionCount, pct: total > 0 ? (abstentionCount / total) * 100 : 0 },
-    { label: 'imod', count: againstCount, pct: total > 0 ? (againstCount / total) * 100 : 0 },
-  ];
-  const majority = votes.reduce((max, v) => v.count > max.count ? v : max, votes[0]);
-  return `${majority.pct.toFixed(0)}% ${majority.label}`;
 }
 
 /* ── Sortable table header helper ─────────────────────────── */
@@ -350,15 +340,6 @@ export function CountryBreakdownTable({ byCountry }: {
 }
 
 /* ── MEP Votes List ───────────────────────────────────────── */
-
-const normalizeVoteLabel = (voteLabel?: string): 'For' | 'Against' | 'Abstention' | null => {
-  if (!voteLabel) return null;
-  const normalized = voteLabel.trim().toLowerCase();
-  if (normalized === 'for') return 'For';
-  if (normalized === 'against' || normalized === 'imod') return 'Against';
-  if (normalized === 'abstention' || normalized === 'undlod') return 'Abstention';
-  return null;
-};
 
 export function MEPVotesList({ votes, byGroup }: {
   votes: MEPVote[];

@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { ToggleButton } from "@/components/toggle-button";
 import { GroupTooltip } from "@/components/group-tooltip";
 import { GROUP_COLORS } from "@/lib/group-colors";
+import { coalitionKey } from "@/lib/data-transforms";
 
 interface WinningCoalition {
   "Winning Coalition": string[];
@@ -35,11 +36,6 @@ interface WinningCoalitionsFile {
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 const MAX_ROWS = 10;
-
-/** Canonical key for a coalition so we can match across perspectives */
-function coalitionKey(groups: string[]): string {
-  return [...groups].sort().join("|");
-}
 
 export function FrequentCoalitionsBarChart({
   committee,
