@@ -60,12 +60,7 @@ const getColor = (value: number): string => {
 };
 
 // Get text color based on background brightness
-const getTextColor = (bgColor: string): string => {
-  // For most of our colors, dark text works well
-  // Only use white text for very dark backgrounds
-  if (bgColor === '#80d8a8' || bgColor === '#a8e0b8') {
-    return '#1f2937'; // dark gray
-  }
+const getTextColor = (_bgColor: string): string => {
   return '#1f2937'; // dark gray for all
 };
 

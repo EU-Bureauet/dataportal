@@ -13,7 +13,8 @@ interface Article {
 }
 
 function extractTag(xml: string, tagName: string): string {
-  const regex = new RegExp(`<${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)<\/${tagName}>`, 'i');
+  // eslint-disable-next-line security/detect-non-literal-regexp -- tagName is from code, not user input
+  const regex = new RegExp(`<${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)</${tagName}>`, 'i');
   const match = xml.match(regex);
   if (!match) return '';
   
@@ -26,7 +27,8 @@ function extractTag(xml: string, tagName: string): string {
 }
 
 function stripHTML(html: string): string {
-  return html.replace(/<[^>]*>/g, '').trim();
+  // eslint-disable-next-line sonarjs/slow-regex -- linear-time negated character class, safe
+  return html.replace(/<[^>]+>/g, '').trim();
 }
 
 function decodeHTML(html: string): string {
@@ -45,56 +47,44 @@ function decodeHTML(html: string): string {
   });
 }
 
+function extractImage(item: string): string {
+  const contentEncoded = extractTag(item, 'content:encoded');
+  if (contentEncoded) {
+    const featuredImgMatch = contentEncoded.match(/<img[^>]*class="[^"]*webfeedsFeaturedVisual[^"]*"[^>]*src="([^">]+)"/);
+    if (featuredImgMatch) return featuredImgMatch[1];
+    const imgMatch = contentEncoded.match(/<img[^>]*src="([^">]+)"/);
+    if (imgMatch) return imgMatch[1];
+  }
+  const mediaContent = extractTag(item, 'media:content');
+  if (mediaContent) {
+    const urlMatch = mediaContent.match(/url="([^"]+)"/);
+    if (urlMatch) return urlMatch[1];
+  }
+  return '';
+}
+
 function parseRSS(xmlText: string): Article[] {
-  const articles: Article[] = [];
-  
   const itemRegex = /<item>([\s\S]*?)<\/item>/g;
   const items = xmlText.match(itemRegex);
   
-  if (!items) return articles;
+  if (!items) return [];
 
-  for (const item of items.slice(0, 6)) {
+  return items.slice(0, 6).map((item) => {
     const title = extractTag(item, 'title');
     const link = extractTag(item, 'link');
     const description = extractTag(item, 'description');
     const pubDate = extractTag(item, 'pubDate');
-    
-    let image = '';
-    const contentEncoded = extractTag(item, 'content:encoded');
-    if (contentEncoded) {
-      const featuredImgMatch = contentEncoded.match(/<img[^>]*class="[^"]*webfeedsFeaturedVisual[^"]*"[^>]*src="([^">]+)"/);
-      if (featuredImgMatch) {
-        image = featuredImgMatch[1];
-      } else {
-        const imgMatch = contentEncoded.match(/<img[^>]*src="([^">]+)"/);
-        if (imgMatch) {
-          image = imgMatch[1];
-        }
-      }
-    }
-    
-    if (!image) {
-      const mediaContent = extractTag(item, 'media:content');
-      if (mediaContent) {
-        const urlMatch = mediaContent.match(/url="([^"]+)"/);
-        if (urlMatch) {
-          image = urlMatch[1];
-        }
-      }
-    }
-
+    const image = extractImage(item);
     const cleanDescription = decodeHTML(stripHTML(description || ''));
 
-    articles.push({
+    return {
       title: decodeHTML(title || 'Ingen titel'),
       link: link || '#',
       description: cleanDescription,
       pubDate: pubDate || new Date().toISOString(),
       image: image || undefined
-    });
-  }
-
-  return articles;
+    };
+  });
 }
 
 export default function NewsCarousel() {

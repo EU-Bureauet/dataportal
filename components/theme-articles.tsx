@@ -70,7 +70,8 @@ function filterByTags(
       id: String(post.id),
       title: decodeHTML(post.title.rendered),
       description: decodeHTML(
-        post.excerpt.rendered.replace(/<[^>]*>/g, "").trim()
+        // eslint-disable-next-line sonarjs/slow-regex -- linear-time negated character class, safe
+        post.excerpt.rendered.replace(/<[^>]+>/g, "").trim()
       ),
       image:
         post._embedded?.["wp:featuredmedia"]?.[0]?.source_url ?? "",

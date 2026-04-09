@@ -8,7 +8,7 @@
  *   3. Cached file  →  keep existing articles.json
  */
 
-import { writeFileSync, existsSync, readFileSync } from "fs";
+import { writeFileSync, existsSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -109,12 +109,16 @@ async function fetchFromRSS() {
 // ── Helpers ─────────────────────────────────────────────────
 
 function extractTag(xml, tag) {
-  const pattern = new RegExp(`<${tag}[^>]*>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`, "i");
+  // eslint-disable-next-line security/detect-non-literal-regexp -- tag is from code, not user input
+  const pattern = new RegExp(`<${tag}[^>]*?>([\\s\\S]*?)</${tag}>`, "i");
   const match = xml.match(pattern);
-  return match ? match[1].trim() : "";
+  if (!match) return "";
+  // Strip CDATA wrapper if present
+  return match[1].replace(/^<!\[CDATA\[/, "").replace(/\]\]>$/, "").trim();
 }
 
 function stripHTML(html) {
+  // eslint-disable-next-line sonarjs/slow-regex -- linear-time negated character class, safe
   return html.replace(/<[^>]*>/g, "");
 }
 

@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename, security/detect-non-literal-regexp -- build-time SSG code, paths from process.cwd() + hardcoded filenames, no user input */
 import fs from "fs";
 import path from "path";
 import { notFound } from "next/navigation";

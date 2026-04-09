@@ -11,6 +11,34 @@ interface MEPDisagreementsViewProps {
   data: MEPPartyDisagreements;
 }
 
+const GROUP_CODE_KEYWORDS: [string, string][] = [
+  ["Renew", "Renew"],
+  ["S&D", "S&D"],
+  ["PPE", "PPE"],
+  ["Verts", "Verts/ALE"],
+  ["ECR", "ECR"],
+  ["Left", "The Left"],
+];
+
+function getGroupCode(politicalGroup: string): string {
+  for (const [keyword, code] of GROUP_CODE_KEYWORDS) {
+    if (politicalGroup.includes(keyword)) return code;
+  }
+  return "NI";
+}
+
+function voteBgClass(voteType: string): string {
+  if (voteType === "For") return "bg-green-100 text-green-800";
+  if (voteType === "Against") return "bg-red-100 text-red-800";
+  return "bg-yellow-100 text-yellow-800";
+}
+
+function voteTextClass(voteType: string): string {
+  if (voteType === "For") return "text-green-700";
+  if (voteType === "Against") return "text-red-700";
+  return "text-yellow-700";
+}
+
 export function MEPDisagreementsView({ data }: MEPDisagreementsViewProps) {
   const router = useRouter();
   const [selectedMEP, setSelectedMEP] = useState<string | null>(null);
@@ -75,13 +103,7 @@ export function MEPDisagreementsView({ data }: MEPDisagreementsViewProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {sortedMEPs.map((mep) => {
               const partyColor = PARTY_COLORS[mep["National_Group"]] || "#6B7280";
-              const groupCode = mep["Political_Group"].includes("Renew") ? "Renew"
-                              : mep["Political_Group"].includes("S&D") ? "S&D"
-                              : mep["Political_Group"].includes("PPE") ? "PPE"
-                              : mep["Political_Group"].includes("Verts") ? "Verts/ALE"
-                              : mep["Political_Group"].includes("ECR") ? "ECR"
-                              : mep["Political_Group"].includes("Left") ? "The Left"
-                              : "NI";
+              const groupCode = getGroupCode(mep["Political_Group"]);
               const groupColor = GROUP_COLORS[groupCode] || "#999999";
 
               return (
@@ -183,11 +205,7 @@ export function MEPDisagreementsView({ data }: MEPDisagreementsViewProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t">
                   <div>
                     <div className="text-sm font-medium text-gray-700 mb-2">MEPs stemme:</div>
-                    <div className={`inline-block px-3 py-1 rounded text-sm font-semibold ${
-                      disagreement["Vote Type"] === "For" ? "bg-green-100 text-green-800" :
-                      disagreement["Vote Type"] === "Against" ? "bg-red-100 text-red-800" :
-                      "bg-yellow-100 text-yellow-800"
-                    }`}>
+                    <div className={`inline-block px-3 py-1 rounded text-sm font-semibold ${voteBgClass(disagreement["Vote Type"])}`}>
                       {disagreement["Vote Type"]}
                     </div>
                   </div>
@@ -196,11 +214,7 @@ export function MEPDisagreementsView({ data }: MEPDisagreementsViewProps) {
                     <div className="text-sm font-medium text-gray-700 mb-2">
                       Flertal af politisk gruppe ({selectedMEPPoliticalGroup || disagreement["Group ID"]}):
                     </div>
-                    <div className={`inline-block px-3 py-1 rounded text-sm font-semibold ${
-                      disagreement["Vote Type_Majority"] === "For" ? "bg-green-100 text-green-800" :
-                      disagreement["Vote Type_Majority"] === "Against" ? "bg-red-100 text-red-800" :
-                      "bg-yellow-100 text-yellow-800"
-                    }`}>
+                    <div className={`inline-block px-3 py-1 rounded text-sm font-semibold ${voteBgClass(disagreement["Vote Type_Majority"])}`}>
                       {disagreement["Vote Type_Majority"]}
                     </div>
                   </div>
@@ -217,11 +231,7 @@ export function MEPDisagreementsView({ data }: MEPDisagreementsViewProps) {
                       return (
                         <div key={group} className="text-xs">
                           <span className="font-medium">{group}:</span>
-                          <span className={`ml-1 ${
-                            vote === "For" ? "text-green-700" :
-                            vote === "Against" ? "text-red-700" :
-                            "text-yellow-700"
-                          }`}>
+                          <span className={`ml-1 ${voteTextClass(vote as string)}`}>
                             {vote as string}
                           </span>
                         </div>

@@ -1,10 +1,9 @@
 "use client"
 
 import React, { Suspense, useMemo, useState, useEffect } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
-import { ChevronDown } from "lucide-react";
+import { VoteGroupCard, FilterPanel, type VoteGroup } from "./components";
 
 interface Vote {
   vote_id: string;
@@ -45,16 +44,6 @@ interface LatestVotesData {
   documents: Document[];
 }
 
-interface VoteGroup {
-  document_reference: string;
-  report: string;
-  short_title: string;
-  document_sitting_date: string;
-  committee: string[];
-  eurovoc_keywords: string[];
-  votes: Vote[];
-}
-
 async function fetcher<T>(url: string): Promise<T> {
   const response = await fetch(url);
   if (!response.ok) {
@@ -68,10 +57,6 @@ const parseCommitteeNames = (committeeField: (string | number)[]): string[] => {
   return committeeField
     .map((item) => String(item).trim())
     .filter(Boolean);
-};
-
-const formatCommitteeLabel = (name: string): string => {
-  return name.replace(/^Udvalget [om|for]\s+[det]?/i, "");
 };
 
 const normalizeSittingDate = (value: string): string => {
@@ -166,6 +151,7 @@ function LatestVotesContent() {
   const searchRegex = useMemo(() => {
     if (!hasActiveSearch) return null;
     const escaped = normalizedQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // eslint-disable-next-line security/detect-non-literal-regexp -- user input is fully escaped above
     return new RegExp(escaped, "i");
   }, [normalizedQuery, hasActiveSearch]);
 
@@ -400,356 +386,34 @@ function LatestVotesContent() {
           <h1 className="text-3xl font-bold">Seneste afstemninger</h1>
         </div>
 
-        {/* Active filter indicators */}
-        {(selectedMep || selectedEurovoc || selectedCommittee) && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold text-blue-900">Aktive filtre</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedMep(null);
-                  setSelectedEurovoc(null);
-                  setSelectedCommittee(null);
-                  setSearchQuery("");
-                }}
-                className="text-xs text-blue-600 hover:text-blue-800 underline cursor-pointer"
-              >
-                Nulstil alle
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {selectedMep && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
-                  MEP: {selectedMep}
-                  <button type="button" onClick={() => setSelectedMep(null)} className="hover:text-red-600 cursor-pointer" aria-label="Fjern MEP filter">✕</button>
-                </span>
-              )}
-              {selectedEurovoc && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
-                  Emneord: {selectedEurovoc}
-                  <button type="button" onClick={() => setSelectedEurovoc(null)} className="hover:text-purple-600 cursor-pointer" aria-label="Fjern emneord filter">✕</button>
-                </span>
-              )}
-              {selectedCommittee && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-emerald-100 text-emerald-800">
-                  Udvalg: {selectedCommittee}
-                  <button type="button" onClick={() => setSelectedCommittee(null)} className="hover:text-emerald-600 cursor-pointer" aria-label="Fjern udvalg filter">✕</button>
-                </span>
-              )}
-            </div>
-            {selectedMep && (
-              <p className="text-xs text-blue-700 mt-2">
-                Viser kun afstemninger hvor {selectedMep} stemte imod sin partigruppe.
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Search */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <label htmlFor="latest-votes-search" className="block text-sm font-semibold text-gray-900 mb-2">
-            Søg i afstemninger
-          </label>
-          <input
-            id="latest-votes-search"
-            type="search"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Søg efter titel, emneord, udvalg eller afstemning..."
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-          />
-          {hasActiveSearch && (
-            <p className="mt-2 text-sm text-gray-600">
-              {totalVotesFound} afstemning{totalVotesFound === 1 ? "" : "er"} fordelt på {filteredGroups.length} sag
-              {filteredGroups.length === 1 ? "" : "er"}.
-            </p>
-          )}
-        </div>
-
-        {/* Committee Filter */}
-        {committeeCounts.length > 0 && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Udvalg</h2>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedCommittee(null)}
-                aria-pressed={selectedCommittee === null}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${
-                  selectedCommittee === null
-                    ? "bg-emerald-600 text-white"
-                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                }`}
-              >
-                Alle
-              </button>
-              {committeeCounts.map((committee) => (
-                <button
-                  key={committee.name}
-                  type="button"
-                  onClick={() => setSelectedCommittee(selectedCommittee === committee.name ? null : committee.name)}
-                  aria-pressed={selectedCommittee === committee.name}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${
-                    selectedCommittee === committee.name
-                      ? "bg-emerald-600 text-white"
-                      : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                  }`}
-                >
-                  {formatCommitteeLabel(committee.name)} ({committee.count})
-                </button>
-              ))}
-              {hasMoreCommittees && (
-                <button
-                  type="button"
-                  onClick={() => setCommitteeDisplayLimit(prev => prev + 15)}
-                  className="px-3 py-1.5 rounded-full text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors underline cursor-pointer"
-                >
-                  Vis flere udvalg...
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Eurovoc Filter */}
-        {eurovocCounts.length > 0 && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Emneord</h2>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedEurovoc(null)}
-                aria-pressed={selectedEurovoc === null}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${
-                  selectedEurovoc === null
-                    ? "bg-purple-600 text-white"
-                    : "bg-purple-50 text-purple-700 hover:bg-purple-100"
-                }`}
-              >
-                Alle
-              </button>
-              {eurovocCounts.map((eurovoc) => (
-                <button
-                  key={eurovoc.label}
-                  type="button"
-                  onClick={() => setSelectedEurovoc(selectedEurovoc === eurovoc.label ? null : eurovoc.label)}
-                  aria-pressed={selectedEurovoc === eurovoc.label}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${
-                    selectedEurovoc === eurovoc.label
-                      ? "bg-purple-600 text-white"
-                      : "bg-purple-50 text-purple-700 hover:bg-purple-100"
-                  }`}
-                >
-                  {eurovoc.label} ({eurovoc.count})
-                </button>
-              ))}
-              {hasMoreEurovoc && (
-                <button
-                  type="button"
-                  onClick={() => setEurovocDisplayLimit(prev => prev + 15)}
-                  className="px-3 py-1.5 rounded-full text-sm font-medium text-purple-600 hover:text-purple-700 hover:bg-purple-50 transition-colors underline cursor-pointer"
-                >
-                  Vis flere emneord...
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+        <FilterPanel
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          selectedCommittee={selectedCommittee}
+          setSelectedCommittee={setSelectedCommittee}
+          selectedEurovoc={selectedEurovoc}
+          setSelectedEurovoc={setSelectedEurovoc}
+          selectedMep={selectedMep}
+          setSelectedMep={setSelectedMep}
+          committeeCounts={committeeCounts}
+          hasMoreCommittees={hasMoreCommittees}
+          onShowMoreCommittees={() => setCommitteeDisplayLimit(prev => prev + 15)}
+          eurovocCounts={eurovocCounts}
+          hasMoreEurovoc={hasMoreEurovoc}
+          onShowMoreEurovoc={() => setEurovocDisplayLimit(prev => prev + 15)}
+          hasActiveSearch={hasActiveSearch}
+          totalVotesFound={totalVotesFound}
+          filteredGroupsCount={filteredGroups.length}
+        />
 
         <div className="space-y-8">
           {paginatedGroups.map(group => (
-            <div
+            <VoteGroupCard
               key={`${group.document_reference}-${normalizeSittingDate(group.document_sitting_date)}`}
-              className="bg-white rounded-lg shadow-md p-6"
-            >
-              {(() => {
-                const groupKey = `${group.document_reference}-${normalizeSittingDate(group.document_sitting_date)}`;
-                const isExpanded = expandedGroups.has(groupKey);
-                const shouldCollapse = group.votes.length > 3;
-                const visibleVotes = shouldCollapse && !isExpanded
-                  ? group.votes.slice(0, 1)
-                  : group.votes;
-                const tableContainerStyle = shouldCollapse
-                  ? { maxHeight: isExpanded ? "2200px" : "220px" }
-                  : undefined;
-
-                return (
-                  <>
-              <div className="mb-6">
-
-                <div className="mt-3 space-y-2">
-                  {group.committee.length > 0 && (
-                    <div>
-                      <div className="flex flex-wrap gap-1">
-                        {group.committee.map((name, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-block px-2 py-0.5 text-xs bg-emerald-100 text-emerald-800 rounded"
-                          >
-                            {name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                  {group.short_title || group.document_reference}
-                </h2>
-                {group.document_reference.trim() && (
-                  <p className="text-sm text-gray-500">
-                    Betænkning: {group.report}
-                  </p>
-                )}
-                <p className="text-sm text-gray-500">
-                  {group.votes.length} afstemning{group.votes.length !== 1 ? "er" : ""} • {group.document_sitting_date}
-                </p>
-
-                {/* Committee and Eurovoc Info */}
-                <div className="mt-3 space-y-2">
-                  {group.eurovoc_keywords.length > 0 && (
-                    <div>
-                      <div className="flex flex-wrap gap-1">
-                        {group.eurovoc_keywords.map((keyword, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-block px-2 py-0.5 text-xs bg-purple-100 text-purple-800 rounded"
-                          >
-                            {keyword}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div
-                className={`overflow-hidden ${shouldCollapse ? "transition-all duration-500 ease-in-out" : ""}`}
-                style={tableContainerStyle}
-              >
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-3 px-2">Afstemning</th>
-                        <th className="text-right py-3 px-2">Stemmer</th>
-                        <th className="text-left py-3 px-2 min-w-[200px]">Fordeling</th>
-                        <th className="text-right py-3 px-2">Flertal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibleVotes.map(vote => {
-                        const total = vote.for + vote.against + vote.abstention;
-                        const forPct = total > 0 ? ((vote.for / total) * 100) : 0;
-                        const abstentionPct = total > 0 ? ((vote.abstention / total) * 100) : 0;
-                        const againstPct = total > 0 ? ((vote.against / total) * 100) : 0;
-
-                        const votes = [
-                          { label: 'for', count: vote.for, pct: forPct },
-                          { label: 'undlod', count: vote.abstention, pct: abstentionPct },
-                          { label: 'imod', count: vote.against, pct: againstPct }
-                        ];
-                        const majority = votes.reduce((max, v) => v.count > max.count ? v : max, votes[0]);
-
-                        return (
-                          <tr key={vote.vote_id} className="border-b hover:bg-gray-50">
-                            <td className="py-3 px-2">
-                              <Link
-                                href={`/vote?id=${vote.vote_id}`}
-                                className="text-blue-600 hover:underline font-medium"
-                              >
-                                {vote.vote_description}
-                              </Link>
-                            </td>
-                            <td className="py-3 px-2 text-right font-semibold">{total}</td>
-                            <td className="py-3 px-2">
-                              <div className="flex items-center gap-2">
-                                <div className="flex-1 h-6 flex rounded overflow-hidden">
-                                  {forPct > 0 && (
-                                    <div
-                                      className="h-full"
-                                      style={{ 
-                                        width: `${forPct}%`, 
-                                        backgroundColor: '#00CC00'
-                                      }}
-                                      title={`For: ${vote.for} (${forPct.toFixed(1)}%)`}
-                                    />
-                                  )}
-                                  {abstentionPct > 0 && (
-                                    <div
-                                      className="h-full"
-                                      style={{ 
-                                        width: `${abstentionPct}%`, 
-                                        backgroundColor: '#FFCC00'
-                                      }}
-                                      title={`Undlod: ${vote.abstention} (${abstentionPct.toFixed(1)}%)`}
-                                    />
-                                  )}
-                                  {againstPct > 0 && (
-                                    <div
-                                      className="h-full"
-                                      style={{ 
-                                        width: `${againstPct}%`, 
-                                        backgroundColor: '#FF0000'
-                                      }}
-                                      title={`Imod: ${vote.against} (${againstPct.toFixed(1)}%)`}
-                                    />
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-3 px-2 text-right">
-                              <span className="font-semibold">
-                                {majority.pct.toFixed(0)}% {majority.label}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {shouldCollapse && (
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setExpandedGroups((previous) => {
-                        const next = new Set(previous);
-                        if (next.has(groupKey)) {
-                          next.delete(groupKey);
-                        } else {
-                          next.add(groupKey);
-                        }
-                        return next;
-                      });
-                    }}
-                    className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-sm font-medium text-blue-600 cursor-pointer transition-colors hover:bg-blue-50 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
-                    aria-expanded={isExpanded}
-                  >
-                    <ChevronDown
-                      size={16}
-                      className={`transition-transform duration-500 ${isExpanded ? "rotate-180" : "rotate-0"}`}
-                    />
-                    {isExpanded
-                      ? "Skjul øvrige afstemninger"
-                      : `Vis ${group.votes.length - 1} øvrige afstemninger`}
-                  </button>
-                </div>
-              )}
-                  </>
-                );
-              })()}
-            </div>
+              group={group}
+              expandedGroups={expandedGroups}
+              setExpandedGroups={setExpandedGroups}
+            />
           ))}
         </div>
 

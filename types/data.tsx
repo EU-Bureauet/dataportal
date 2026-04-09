@@ -188,7 +188,7 @@ export interface MEPData {
   links: {
     homepage: string | null;
     ep_profile: string;
-    account: any[] | null;
+    account: string[] | null;
   };
   memberships: {
     [key: string]: Membership[];
@@ -427,6 +427,7 @@ export const COMMITTEE_NAMES: { [key: string]: string } = {
 // Helper function to get available committees from overlap data
 export function getAvailableCommittees(overlapData: VotingOverlap[]): Array<{code: string, name: string}> {
   // Import committee names from JSON file
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const committeeNamesData = require("@/data/committee_and_group_names.json");
   
   const committees = [...new Set(overlapData.map(overlap => overlap.filter))]
@@ -640,7 +641,7 @@ export function extractCountryFromPartyName(partyName: string): {
   partyNameWithoutCountry: string;
   country: string;
 } {
-  const match = partyName.match(/^(.+?)\s*\(([^)]+)\)$/);
+  const match = partyName.match(/^([^(]*)\(([^)]+)\)$/);
   if (match) {
     return {
       partyNameWithoutCountry: match[1].trim(),

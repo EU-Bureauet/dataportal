@@ -67,6 +67,42 @@ interface SeatPosition {
   group: GroupInfo;
 }
 
+function distributeSeatsInRow(
+  row: { radius: number; seatCount: number },
+  groupAngles: { group: GroupInfo; startAngle: number; endAngle: number }[],
+  totalSeats: number,
+  cx: number,
+  cy: number
+): SeatPosition[] {
+  const seatsPerGroup: { group: GroupInfo; count: number }[] = [];
+  let assigned = 0;
+  for (let gi = 0; gi < groupAngles.length; gi++) {
+    const ga = groupAngles[gi];
+    const raw = (ga.group.seats / totalSeats) * row.seatCount;
+    const count = gi === groupAngles.length - 1
+      ? row.seatCount - assigned
+      : Math.round(raw);
+    seatsPerGroup.push({ group: ga.group, count });
+    assigned += count;
+  }
+
+  const positions: SeatPosition[] = [];
+  let seatIdx = 0;
+  const totalSeatsInRow = seatsPerGroup.reduce((s, g) => s + g.count, 0);
+  for (const sg of seatsPerGroup) {
+    for (let s = 0; s < sg.count; s++) {
+      const angle = Math.PI - (seatIdx / (totalSeatsInRow - 1 || 1)) * Math.PI;
+      positions.push({
+        x: cx + row.radius * Math.cos(angle),
+        y: cy - row.radius * Math.sin(angle),
+        group: sg.group,
+      });
+      seatIdx++;
+    }
+  }
+  return positions;
+}
+
 function computeSeatsProportional(
   width: number,
   height: number,
@@ -113,35 +149,7 @@ function computeSeatsProportional(
     angleCursor -= span;
   }
 
-  const positions: SeatPosition[] = [];
-
-  for (const row of rows) {
-    const seatsPerGroup: { group: GroupInfo; count: number; startAngle: number; endAngle: number }[] = [];
-    let assigned = 0;
-    for (let gi = 0; gi < groupAngles.length; gi++) {
-      const ga = groupAngles[gi];
-      const raw = (ga.group.seats / totalSeats) * row.seatCount;
-      const count = gi === groupAngles.length - 1
-        ? row.seatCount - assigned
-        : Math.round(raw);
-      seatsPerGroup.push({ group: ga.group, count, startAngle: ga.startAngle, endAngle: ga.endAngle });
-      assigned += count;
-    }
-
-    let seatIdx = 0;
-    const totalSeatsInRow = seatsPerGroup.reduce((s, g) => s + g.count, 0);
-    for (const sg of seatsPerGroup) {
-      for (let s = 0; s < sg.count; s++) {
-        const angle = Math.PI - (seatIdx / (totalSeatsInRow - 1 || 1)) * Math.PI;
-        const x = cx + row.radius * Math.cos(angle);
-        const y = cy - row.radius * Math.sin(angle);
-        positions.push({ x, y, group: sg.group });
-        seatIdx++;
-      }
-    }
-  }
-
-  return positions;
+  return rows.flatMap((row) => distributeSeatsInRow(row, groupAngles, totalSeats, cx, cy));
 }
 
 interface TooltipState {
@@ -258,13 +266,10 @@ export function ParliamentHemicycle() {
     const svg = d3.select(svgRef.current);
     svg
       .selectAll<SVGCircleElement, SeatPosition>("circle")
-      .attr("opacity", (d) =>
-        activeGroup === null
-          ? 0.85
-          : d.group.code === activeGroup
-            ? 1
-            : 0.2
-      )
+      .attr("opacity", (d) => {
+        if (activeGroup === null) return 0.85;
+        return d.group.code === activeGroup ? 1 : 0.2;
+      })
       .attr("r", (d) => {
         const base = Math.max(3, Math.min(5.5, dimensions.width / 160));
         return d.group.code === activeGroup ? base * 1.25 : base;

@@ -253,8 +253,14 @@ function AllyBar({ allies, mepGroup, groupDescriptions }: { allies: AllyCount[];
 function VoteRow({ d, groupCodes, groupDescriptions }: { d: Disagreement; groupCodes: readonly string[]; groupDescriptions: Record<string, string> }) {
   const mepVote = d["Vote Type"];
   const groupVote = d["Vote Type_Majority"];
-  const voteLabel = (v: string) => v === "For" ? "For" : v === "Against" ? "Imod" : "Blank";
-  const voteColor = (v: string) => v === "For" ? "text-emerald-700 bg-emerald-50" : v === "Against" ? "text-red-700 bg-red-50" : "text-amber-700 bg-amber-50";
+
+  const VOTE_LABELS: Record<string, string> = { "For": "For", "Against": "Imod" };
+  const VOTE_COLORS: Record<string, string> = {
+    "For": "text-emerald-700 bg-emerald-50",
+    "Against": "text-red-700 bg-red-50",
+  };
+  const voteLabel = (v: string) => VOTE_LABELS[v] ?? "Blank";
+  const voteColor = (v: string) => VOTE_COLORS[v] ?? "text-amber-700 bg-amber-50";
 
   // Groups that voted the same as the MEP
   const sameAsMe = groupCodes.filter((gc) => {
@@ -438,6 +444,7 @@ export function DanishMEPVotesChart() {
         continue;
       }
       if (searchFilter) {
+        // eslint-disable-next-line security/detect-non-literal-regexp -- input is fully escaped
         const re = new RegExp(searchFilter.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
         if (keywords.some((kw) => re.test(kw))) {
           ids.add(vid);
@@ -460,17 +467,20 @@ export function DanishMEPVotesChart() {
       // Apply topic filter via search/eurovoc if provided
       let filtered = mepDisag;
       if ((searchFilter || eurovocFilter) && voteTopicMap) {
+        /* eslint-disable sonarjs/no-nested-functions -- filter/some callbacks inside useMemo.map() */
         filtered = mepDisag.filter((d) => {
           const keywords = voteTopicMap.get(d["Vote ID"]);
           if (!keywords) return false;
           if (eurovocFilter && keywords.some((kw) => kw.toLowerCase() === eurovocFilter.toLowerCase())) return true;
           if (searchFilter) {
+            // eslint-disable-next-line security/detect-non-literal-regexp -- input is fully escaped
             const re = new RegExp(searchFilter.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
             const fields = [d["Short Title"], d["Document Title"], ...keywords];
             return fields.some((f) => re.test(f));
           }
           return false;
         });
+        /* eslint-enable sonarjs/no-nested-functions */
       }
 
       // Compute allies when breaking ranks

@@ -197,7 +197,7 @@ export function CommitteeOverview({ data }: CommitteeOverviewProps) {
               <div className="flex justify-between items-start mb-2">
                 <div className="flex-1">
                   <h3 className="font-semibold text-sm mb-1">
-                    {vote.short_title ? vote.short_title : (vote.title !== "Ukendt titel" ? vote.title : vote.description)}
+                    {vote.short_title || (vote.title !== "Ukendt titel" ? vote.title : vote.description)}
                   </h3>
                   {(vote.short_title || vote.title !== "Ukendt titel") && (
                     <p className="text-xs text-gray-600">{vote.description}</p>
