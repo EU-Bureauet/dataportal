@@ -32,6 +32,7 @@
   <a href="#high-level">High-Level Architecture</a>
   <a href="#tema-flow">Tema Page Data Flow</a>
   <a href="#component-data">Component → Data Map</a>
+  <a href="#theme-cross-refs">Theme Cross-References</a>
   <a href="#build-runtime">Build vs Runtime Sequence</a>
 </nav>
 
@@ -41,66 +42,75 @@
 <section id="high-level">
   <h2>1. High-Level App Architecture</h2>
   <p class="desc">
-    Shows the three layers: external WordPress source, build-time pipeline
-    (fetch-articles.mjs → articles.json, theme configs), pre-computed analytics JSON files,
-    and the Next.js app with its pages.
+    Shows the layers: external WordPress source (queried both at build-time for tag-ID sync
+    and at runtime by the browser for articles), the build-time tag-ID sync script, the
+    pre-computed analytics + theme-vote JSON files, and the Next.js app with its pages.
   </p>
   <div class="mermaid">
 graph TB
     subgraph External["External Data Sources"]
-        WP["WordPress\neubureauet.dk"]
-        RSS["RSS Feed\n/feed/"]
+        WP["WordPress<br/>eubureauet.dk<br/>(REST API)"]
     end
 
     subgraph BuildTime["Build-Time Pipeline"]
-        FETCH["scripts/fetch-articles.mjs\n(npm run prebuild)"]
-        ART_JSON["data/articles.json"]
-        THEME_JSON["data/themes/*.json\nenergy · forsvar · miljoe"]
+        SYNC["scripts/sync-theme-tag-ids.mjs<br/>(npm run prebuild)"]
+        THEME_JSON["data/themes/*.json<br/>energi, forsvar, miljoe<br/>(updated tagIds)"]
     end
 
     subgraph StaticData["Pre-Computed Analytics (data/)"]
-        COAL["All_Winning_coalitions.json"]
-        PAIR["All_Pairwise_coalitions.json"]
-        WINS["All_Group_wins.json"]
+        COAL["All_Winning_coalitions.json<br/>TOTAL + committees + theme_KEY"]
+        PAIR["All_Pairwise_coalitions.json<br/>TOTAL + committees + theme_KEY"]
+        WINS["All_Group_wins.json<br/>TOTAL + committees + theme_KEY"]
         VOTES["latest_votes.json"]
+        TVOTES["theme_votes_*.json<br/>forsvar_sikkerhed<br/>energi_industri<br/>miljo_sundhed"]
         MEPS["meps_clean.json"]
-        DANISH["Danske_MEPs_brud_med_\npartigruppelinjen.json"]
-        NATL["national_party_\ndisagreements.json"]
+        DANISH["Danske_MEPs_brud_med_<br/>partigruppelinjen.json"]
+        NATL["national_party_<br/>disagreements.json"]
         VOTE_DET["vote_details_*.json"]
         MEP_DET["mep_*.json"]
-        REF["group-tooltips.json\ncommittee_and_group_names.json"]
+        REF["group-tooltips.json<br/>committee_and_group_names.json"]
     end
 
     subgraph App["Next.js App (Static Export)"]
-        LAYOUT["layout.tsx\nNavigationHeader · Footer"]
+        LAYOUT["layout.tsx<br/>NavigationHeader, Footer"]
         LANDING["/ Landing Page"]
         TEMA["tema/slug"]
-        PAGES["Feature Pages\nheatmap · group-wins\nwinning-coalitions\nmeps · vote · etc."]
+        PAGES["Feature Pages<br/>heatmap, group-wins<br/>winning-coalitions<br/>latest-votes, meps, etc."]
     end
 
-    WP -->|REST API| FETCH
-    RSS -->|fallback| FETCH
-    FETCH --> ART_JSON
+    WP -->|GET /wp/v2/tags| SYNC
+    SYNC --> THEME_JSON
 
     THEME_JSON -->|generateStaticParams| TEMA
-    ART_JSON -->|filtered by tags| TEMA
-    COAL & PAIR & WINS --> TEMA
-    COAL & PAIR & WINS & VOTES --> PAGES
-    MEPS & DANISH & NATL --> PAGES
-    VOTE_DET & MEP_DET --> PAGES
+    TVOTES -->|donut chart + theme datasets| TEMA
+    COAL --> TEMA
+    PAIR --> TEMA
+    WINS --> TEMA
+    COAL --> PAGES
+    PAIR --> PAGES
+    WINS --> PAGES
+    VOTES --> PAGES
+    TVOTES --> PAGES
+    MEPS --> PAGES
+    DANISH --> PAGES
+    NATL --> PAGES
+    VOTE_DET --> PAGES
+    MEP_DET --> PAGES
     REF -->|lookups| PAGES
     REF -->|lookups| TEMA
-    ART_JSON --> LANDING
-    LAYOUT --> LANDING & TEMA & PAGES
+    WP -.->|runtime: GET /wp/v2/posts| TEMA
+    LAYOUT --> LANDING
+    LAYOUT --> TEMA
+    LAYOUT --> PAGES
 
     classDef external fill:#f9e2af,stroke:#dfab01,color:#000
     classDef build fill:#a6e3a1,stroke:#40a02b,color:#000
     classDef data fill:#89b4fa,stroke:#1e66f5,color:#000
     classDef app fill:#cba6f7,stroke:#8839ef,color:#000
 
-    class WP,RSS external
-    class FETCH,ART_JSON,THEME_JSON build
-    class COAL,PAIR,WINS,VOTES,MEPS,DANISH,NATL,VOTE_DET,MEP_DET,REF data
+    class WP external
+    class SYNC,THEME_JSON build
+    class COAL,PAIR,WINS,VOTES,TVOTES,MEPS,DANISH,NATL,VOTE_DET,MEP_DET,REF data
     class LAYOUT,LANDING,TEMA,PAGES app
   </div>
 </section>
@@ -109,53 +119,65 @@ graph TB
 <section id="tema-flow">
   <h2>2. Tema Page – Data Flow &amp; Component Dependencies</h2>
   <p class="desc">
-    How tema/[slug]/page.tsx works: theme config JSON files drive generateStaticParams(),
-    getThemeArticles() filters articles.json by tags, and VisualisationCards link to feature
-    pages with committee query params.
+    How tema/[slug]/page.tsx works: theme config JSONs drive generateStaticParams(),
+    the ThemeArticles client component lazy-fetches articles directly from the WordPress
+    REST API using the synced tagIds, the donut chart reads the per-theme theme_votes_*.json,
+    and VisualisationCards link to feature pages with theme/committee query params.
   </p>
   <div class="mermaid">
 graph LR
     subgraph ThemeConfig["Theme Config (data/themes/)"]
-        ENERGI["energi.json\ncommittee: ITRE\neurovoc: energipolitik"]
-        FORSVAR["forsvar.json\ncommittee: SEDE\neurovoc: forsvarspolitik"]
-        MILJOE["miljoe.json\ncommittee: ENVI\neurovoc: miljøpolitik"]
+        ENERGI["energi.json<br/>themeKey: theme_energi_industri<br/>tagIds: 110"]
+        FORSVAR["forsvar.json<br/>themeKey: theme_forsvar_sikkerhed<br/>tagIds: 105"]
+        MILJOE["miljoe.json<br/>themeKey: theme_miljo_sundhed<br/>tagIds: 106"]
     end
 
-    subgraph TemaPage["app/tema/slug/page.tsx\n(Server Component)"]
-        SSG["generateStaticParams()\nreads all theme JSONs"]
-        FILTER["getThemeArticles()\nfilters by articleFilter.tags"]
-        GEN_SUB["generateSubDescription()\nreads dataSource.file"]
+    subgraph TemaPage["app/tema/slug/page.tsx (Server Component)"]
+        SSG["generateStaticParams()<br/>reads all theme JSONs"]
+        GEN_SUB["generateSubDescription()<br/>reads dataSource.file"]
     end
 
     subgraph Components["Client Components"]
-        HERO["HeroSection\ntitle · subtitle · heroImage"]
-        TA["ThemeArticles\nfetches WP API + fallback articles.json"]
-        VC["VisualisationCard × N\none per theme.visualisations[]"]
-        PH["ParliamentHemicycle\ninteractive seating chart"]
+        HERO["HeroSection<br/>title, subtitle, heroImage"]
+        TA["ThemeArticles<br/>useSWR to WP REST API runtime<br/>(spinner + error states)"]
+        DONUT["ThemeDonutChart<br/>slices link to /latest-votes with doc=ref"]
+        VC["VisualisationCard x N<br/>one per theme.visualisations"]
     end
 
     subgraph DataFiles["Data Files"]
-        ART["articles.json"]
+        TVOTES["theme_votes_KEY.json"]
         LV["latest_votes.json"]
         PAIR["All_Pairwise_coalitions.json"]
+        WP["WordPress<br/>/wp/v2/posts (tags, _embed)"]
     end
 
-    subgraph LinkedPages["Linked Visualisation Pages\n(via href in visualisations[])"]
-        HEAT["/heatmap?committee=ITRE"]
-        GW["/group-wins?committee=ITRE"]
-        WC["/winning-coalitions?committee=ITRE"]
-        LVP["/latest-votes?search=energi"]
-        TWC["/theme-winning-coalitions"]
+    subgraph LinkedPages["Linked Visualisation Pages (via href)"]
+        HEAT["/heatmap?theme=theme_KEY"]
+        LVP["/latest-votes?search,eurovoc<br/>(swaps to theme_votes_KEY.json)"]
+        DMV["/danish-mep-votes?search,eurovoc"]
+        TWC["/theme-winning-coalitions?committee,theme"]
     end
 
-    ENERGI & FORSVAR & MILJOE --> SSG
-    SSG --> HERO & TA & VC & PH
+    ENERGI --> SSG
+    FORSVAR --> SSG
+    MILJOE --> SSG
+    SSG --> HERO
+    SSG --> TA
+    SSG --> VC
+    SSG --> DONUT
 
-    ART -->|build-time filter| FILTER --> TA
-    LV -->|dataSource.file| GEN_SUB --> VC
+    ENERGI -->|articleFilter.tagIds| TA
+    TA -.->|runtime fetch| WP
+    LV -->|dataSource.file| GEN_SUB
+    GEN_SUB --> VC
     PAIR -->|dataSource.file| GEN_SUB
+    TVOTES --> DONUT
 
-    VC -->|href links| HEAT & GW & WC & LVP & TWC
+    VC -->|href links| HEAT
+    VC -->|href links| LVP
+    VC -->|href links| DMV
+    VC -->|href links| TWC
+    DONUT -.->|deep link with doc param| LVP
 
     classDef config fill:#a6e3a1,stroke:#40a02b,color:#000
     classDef page fill:#cba6f7,stroke:#8839ef,color:#000
@@ -164,10 +186,10 @@ graph LR
     classDef linked fill:#f5c2e7,stroke:#ea76cb,color:#000
 
     class ENERGI,FORSVAR,MILJOE config
-    class SSG,FILTER,GEN_SUB page
-    class HERO,TA,VC,PH comp
-    class ART,LV,PAIR data
-    class HEAT,GW,WC,LVP,TWC linked
+    class SSG,GEN_SUB page
+    class HERO,TA,VC,DONUT comp
+    class TVOTES,LV,PAIR,WP data
+    class HEAT,LVP,DMV,TWC linked
   </div>
 </section>
 
@@ -177,29 +199,34 @@ graph LR
   <p class="desc">
     Shows exactly which JSON file each chart component fetches (via useSWR or props),
     plus the shared libraries (group-colors.ts, data-transforms.ts) they all depend on.
+    ThemeArticles is the only component that fetches from an external origin (WordPress).
   </p>
   <div class="mermaid">
 graph LR
     subgraph JSON["JSON Data Files (data/)"]
-        COAL["All_Winning_coalitions.json\nTOTAL + 26 committees"]
-        PAIR["All_Pairwise_coalitions.json\nTOTAL + 26 committees"]
-        WINS["All_Group_wins.json\nTOTAL + 26 committees"]
-        VOTES["latest_votes.json\nvote metadata + committees"]
-        MEPS["meps_clean.json\n720 MEPs"]
-        DANISH["Danske_MEPs_brud_med_\npartigruppelinjen.json"]
+        COAL["All_Winning_coalitions.json<br/>TOTAL + committees + theme_KEY"]
+        PAIR["All_Pairwise_coalitions.json<br/>TOTAL + committees + theme_KEY"]
+        WINS["All_Group_wins.json<br/>TOTAL + committees + theme_KEY"]
+        VOTES["latest_votes.json"]
+        TVOTES["theme_votes_*.json"]
+        MEPS["meps_clean.json"]
+        DANISH["Danske_MEPs_brud_med_<br/>partigruppelinjen.json"]
         NATL["national_party_disagreements.json"]
-        VDET["vote_details_*.json\nper-vote breakdowns"]
-        MDET["mep_*.json\nper-MEP vote lists"]
+        VDET["vote_details_*.json"]
+        MDET["mep_*.json"]
         TIPS["group-tooltips.json"]
         NAMES["committee_and_group_names.json"]
-        ARTS["articles.json"]
+    end
+
+    subgraph Ext["External"]
+        WP["WordPress REST API<br/>/wp/v2/posts (tags, _embed)"]
     end
 
     subgraph Charts["Chart Components"]
         SB["CoalitionsSunburst"]
-        FBC["FrequentCoalitions\nBarChart"]
-        WCC["WinningCoalition\nColumnChart"]
-        HM["HeatmapGrid"]
+        FBC["FrequentCoalitionsBarChart"]
+        WCC["WinningCoalitionColumnChart"]
+        HM["HeatmapGrid<br/>(theme mode: theme_KEY)"]
         GWC["GroupWinsChart"]
         VRC["VoteResultChart"]
         VDV["VoteDetailsView"]
@@ -208,6 +235,9 @@ graph LR
         NPD["NationalPartyDisagreementsView"]
         MO["MEPsOverview"]
         TC["ThemeCoalitions"]
+        TA["ThemeArticles<br/>(runtime WP fetch)"]
+        TDC["ThemeDonutChart"]
+        LV_PAGE["LatestVotes page<br/>(swaps to theme_votes_*.json<br/>when search+eurovoc match)"]
     end
 
     subgraph Shared["Shared / Reference"]
@@ -215,82 +245,177 @@ graph LR
         DT["lib/data-transforms.ts"]
     end
 
-    COAL -->|useSWR| FBC & TC
+    COAL -->|useSWR| FBC
+    COAL -->|useSWR| TC
     COAL -->|prop| SB
     PAIR -->|useSWR| TC
-    PAIR -->|prop| HM
+    PAIR -->|useSWR| HM
     WINS -->|useSWR| WCC
-    VOTES --> DMV
+    WINS -->|useSWR| GWC
+    VOTES -->|useSWR| LV_PAGE
+    VOTES -->|useSWR| DMV
+    TVOTES -->|prop| TDC
+    TVOTES -->|useSWR theme mode| LV_PAGE
     MEPS -->|useSWR| MO
     DANISH -->|useSWR| MDV
+    DANISH -->|useSWR| LV_PAGE
     NATL -->|useSWR| NPD
-    VDET -->|useSWR| VDV & VRC
+    VDET -->|useSWR| VDV
+    VDET -->|useSWR| VRC
     MDET -->|useSWR| MO
-    TIPS -->|useSWR| FBC & WCC & TC
-    NAMES -->|import/useSWR| FBC & WCC & TC & GWC & VDV
-    ARTS -->|fallback| TA2["ThemeArticles"]
+    TIPS -->|useSWR| FBC
+    TIPS -->|useSWR| WCC
+    TIPS -->|useSWR| TC
+    NAMES -->|import/useSWR| FBC
+    NAMES -->|import/useSWR| WCC
+    NAMES -->|import/useSWR| TC
+    NAMES -->|import/useSWR| GWC
+    NAMES -->|import/useSWR| VDV
+    NAMES -->|import/useSWR| HM
+    WP -.->|runtime fetch| TA
 
-    GC --> FBC & WCC & HM & TC & SB & GWC & MDV
-    DT --> HM & FBC & SB & WCC & VDV
+    GC --> FBC
+    GC --> WCC
+    GC --> HM
+    GC --> TC
+    GC --> SB
+    GC --> GWC
+    GC --> MDV
+    DT --> HM
+    DT --> FBC
+    DT --> SB
+    DT --> WCC
+    DT --> VDV
 
     classDef data fill:#f9e2af,stroke:#dfab01,color:#000
     classDef chart fill:#89b4fa,stroke:#1e66f5,color:#000
     classDef shared fill:#a6e3a1,stroke:#40a02b,color:#000
+    classDef ext fill:#f5c2e7,stroke:#ea76cb,color:#000
 
-    class COAL,PAIR,WINS,VOTES,MEPS,DANISH,NATL,VDET,MDET,TIPS,NAMES,ARTS data
-    class SB,FBC,WCC,HM,GWC,VRC,VDV,DMV,MDV,NPD,MO,TC,TA2 chart
+    class COAL,PAIR,WINS,VOTES,TVOTES,MEPS,DANISH,NATL,VDET,MDET,TIPS,NAMES data
+    class SB,FBC,WCC,HM,GWC,VRC,VDV,DMV,MDV,NPD,MO,TC,TA,TDC,LV_PAGE chart
     class GC,DT shared
+    class WP ext
   </div>
 </section>
 
 <!-- ─── Diagram 4 ─── -->
-<section id="build-runtime">
-  <h2>4. Build-Time vs Client-Runtime Data Flow</h2>
+<section id="theme-cross-refs">
+  <h2>4. Theme Cross-References Between Data Files</h2>
   <p class="desc">
-    Temporal flow: build-time fetches WordPress articles and statically generates tema pages,
-    then at runtime the browser hydrates charts by fetching JSON via useSWR.
+    Each theme is identified by a single <code>themeKey</code> (e.g. <code>theme_miljo_sundhed</code>)
+    that links the theme config, the per-theme votes file, and the matching groupings inside
+    the three <code>All_*</code> coalition files. The <code>theme_votes_*.json</code> files in turn
+    cross-reference Danish-MEP disagreements (via <code>vote_id</code>) and feed deep-links into
+    <code>/latest-votes</code> (via <code>document_reference</code>).
+  </p>
+  <div class="mermaid">
+graph LR
+    subgraph Config["data/themes/SLUG.json"]
+        CFG["slug: miljoe<br/>themeKey: theme_miljo_sundhed<br/>articleFilter.tagIds: 106<br/>visualisations:<br/>- href: /heatmap?theme=theme_miljo_sundhed<br/>- href: /latest-votes (search, eurovoc)<br/>- dataSource.file: latest_votes.json<br/>- dataSource.file: All_Pairwise_coalitions.json"]
+    end
+
+    subgraph ThemeVotes["data/theme_votes_KEY.json"]
+        TV_META["metadata<br/>theme: theme_miljo_sundhed<br/>theme_label, theme_definition<br/>votes_total, documents_total"]
+        TV_TILES["committees / eurovoc<br/>(precomputed tile counts)"]
+        TV_DOCS["documents<br/>document_reference<br/>document_sitting_date<br/>short_title, eurovoc_keywords<br/>voteCount"]
+        TV_VOTES["votes<br/>vote_id<br/>vote_description<br/>for / against / abstention"]
+        TV_DOCS --> TV_VOTES
+    end
+
+    subgraph CoalAll["All_*.json (TOTAL + committees + theme_KEY)"]
+        AP["All_Pairwise_coalitions.json<br/>TOTAL.total_coalitions<br/>COMMITTEE.coalitions<br/>theme_miljo_sundhed: array"]
+        AW["All_Winning_coalitions.json<br/>theme_miljo_sundhed: array"]
+        AG["All_Group_wins.json<br/>theme_miljo_sundhed: array"]
+    end
+
+    subgraph Pages["Pages / Components"]
+        TEMA["/tema/miljoe"]
+        DONUT["ThemeDonutChart"]
+        HEAT["/heatmap?theme=theme_miljo_sundhed<br/>(HeatmapGrid)"]
+        LV["/latest-votes (search, eurovoc)<br/>(swaps to theme_votes_*.json)"]
+        LV_DOC["/latest-votes with doc=REFERENCE<br/>(auto-scroll + expand card)"]
+    end
+
+    subgraph CrossLinks["Cross-File Joins"]
+        DANISH["Danske_MEPs_brud_med_<br/>partigruppelinjen.json<br/>(per-MEP vote_id list)"]
+    end
+
+    CFG -->|themeKey selects grouping| AP
+    CFG -->|themeKey selects grouping| AW
+    CFG -->|themeKey selects grouping| AG
+    CFG -->|themeKey to file name| TV_META
+    CFG --> TEMA
+
+    TV_DOCS --> DONUT
+    TV_META --> DONUT
+    DONUT -->|slice click to document_reference| LV_DOC
+
+    AP -->|theme grouping| HEAT
+    TV_DOCS --> LV
+    TV_VOTES -->|vote_id join| DANISH
+    DANISH -->|per-MEP brud filter| LV
+
+    classDef config fill:#a6e3a1,stroke:#40a02b,color:#000
+    classDef tvote fill:#fab387,stroke:#fe640b,color:#000
+    classDef coal fill:#89b4fa,stroke:#1e66f5,color:#000
+    classDef page fill:#cba6f7,stroke:#8839ef,color:#000
+    classDef cross fill:#f5c2e7,stroke:#ea76cb,color:#000
+
+    class CFG config
+    class TV_META,TV_TILES,TV_DOCS,TV_VOTES tvote
+    class AP,AW,AG coal
+    class TEMA,DONUT,HEAT,LV,LV_DOC page
+    class DANISH cross
+  </div>
+</section>
+
+<!-- ─── Diagram 5 ─── -->
+<section id="build-runtime">
+  <h2>5. Build-Time vs Client-Runtime Data Flow</h2>
+  <p class="desc">
+    Temporal flow: at build-time only the WordPress tag-ID sync runs, then Next.js
+    statically generates all pages. At runtime the browser fetches the static JSON files
+    via SWR, plus theme pages call the WordPress REST API directly to lazy-load articles.
   </p>
   <div class="mermaid">
 sequenceDiagram
-    participant WP as WordPress (eubureauet.dk)
-    participant Script as fetch-articles.mjs (build-time)
-    participant FS as data/ folder
-    participant Next as Next.js SSG (npm run build)
-    participant Browser as Browser (Client)
+    participant WP as WordPress
+    participant Sync as sync-theme-tag-ids
+    participant FS as data folder
+    participant Next as Next.js SSG
+    participant Browser as Browser
 
     rect rgb(230, 245, 230)
         Note over WP,FS: BUILD-TIME (prebuild + build)
-        WP->>Script: REST API /wp-json/wp/v2/posts?_embed
-        Script->>Script: paginate, decode HTML entities
-        alt API fails
-            WP->>Script: RSS /feed/ (fallback)
-            Script->>Script: parse XML
-        end
-        Script->>FS: write articles.json
+        WP->>Sync: GET /wp-json/wp/v2/tags
+        Sync->>Sync: build name to id index
+        Sync->>FS: update data/themes/*.json (articleFilter.tagIds)
+        Note right of Sync: On WP failure - warn and exit 0 (keeps previous tagIds)
 
         FS->>Next: read data/themes/*.json
-        Next->>Next: generateStaticParams() → [energi, forsvar, miljoe]
-        FS->>Next: read articles.json (filter by tags)
-        FS->>Next: read latest_votes.json + All_Pairwise_coalitions.json
-        Next->>Next: generateSubDescription() per visualisation
-        Next->>Next: export static HTML + JSON to /out
+        Next->>Next: generateStaticParams returns energi, forsvar, miljoe
+        FS->>Next: read latest_votes.json and All_Pairwise_coalitions.json
+        Next->>Next: generateSubDescription per visualisation
+        Next->>Next: export static HTML and JSON to /out
+        Note right of Next: No articles fetched at build-time
     end
 
     rect rgb(230, 235, 250)
         Note over Browser,FS: CLIENT RUNTIME
         Browser->>Browser: Load static HTML page
-        Browser->>FS: useSWR → /data/All_Winning_coalitions.json
-        Browser->>FS: useSWR → /data/All_Group_wins.json
-        Browser->>FS: useSWR → /data/group-tooltips.json
-        Browser->>FS: useSWR → /data/committee_and_group_names.json
+        Browser->>FS: useSWR /data/All_*.json
+        Browser->>FS: useSWR /data/theme_votes_KEY.json (theme mode)
+        Browser->>FS: useSWR /data/group-tooltips.json
+        Browser->>FS: useSWR /data/committee_and_group_names.json
         FS-->>Browser: JSON responses
         Browser->>Browser: Pure transforms (data-transforms.ts)
-        Browser->>Browser: Render charts (Recharts / D3 / Chart.js)
+        Browser->>Browser: Render charts (Recharts, D3, Chart.js)
 
-        Browser->>WP: ThemeArticles: fetch WP API (live)
-        alt WP unreachable
-            Browser->>FS: fallback → articles.json
-        end
+        Note over Browser,WP: Tema page only
+        Browser->>WP: ThemeArticles useSWR /wp/v2/posts (tags, per_page, _embed)
+        WP-->>Browser: Article list (live)
+        Note right of Browser: Spinner while loading, error message if WP unreachable
     end
   </div>
 </section>
@@ -298,7 +423,7 @@ sequenceDiagram
 </main>
 
 <footer>
-  EU-Bureauet Dataportal &middot; Architecture Documentation &middot; Generated April 2026
+  EU-Bureauet Dataportal &middot; Architecture Documentation &middot; Updated May 2026
 </footer>
 
 <script type="module">
