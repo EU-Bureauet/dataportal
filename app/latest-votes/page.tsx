@@ -76,6 +76,54 @@ const sortVotesByNewest = (votes: Vote[]): Vote[] => {
 
 const ITEMS_PER_PAGE = 25;
 
+/** When the latest-votes page is reached from a theme card, the URL carries
+ * a fixed (search, eurovoc) combo. We swap the global `latest_votes.json`
+ * for the theme's curated dataset and surface the theme label in the page
+ * heading. Keys are `"<search>|<eurovoc>"` (lower-cased) and must match the
+ * `href` defined on the theme JSON's "Liste over afstemninger" visualisation. */
+interface ThemeDatasetEntry {
+  file: string;
+  label: string;
+}
+const THEME_DATASETS: Record<string, ThemeDatasetEntry> = {
+  "forsvar|forsvarspolitik": {
+    file: "theme_votes_forsvar_sikkerhed.json",
+    label: "Forsvar og sikkerhed",
+  },
+  "milj\u00f8|milj\u00f8politik": {
+    file: "theme_votes_miljo_sundhed.json",
+    label: "Milj\u00f8 og sundhed",
+  },
+  "energi|energipolitik": {
+    file: "theme_votes_energi_industri.json",
+    label: "Energi og industri",
+  },
+};
+
+function matchThemeDataset(search: string | null, eurovoc: string | null): ThemeDatasetEntry | null {
+  if (!search || !eurovoc) return null;
+  return THEME_DATASETS[`${search.toLowerCase()}|${eurovoc.toLowerCase()}`] ?? null;
+}
+
+/** Theme datasets store the date once on the document but omit per-vote
+ * `sitting_date`. Inject it so downstream code (sorting, grouping) can stay
+ * unchanged. */
+function normalizeThemeData(data: LatestVotesData): LatestVotesData {
+  return {
+    ...data,
+    documents: data.documents.map((doc) => {
+      const docDate = (doc.document_sitting_date || "").split(/[T ]/)[0];
+      return {
+        ...doc,
+        votes: doc.votes.map((v) => ({
+          ...v,
+          sitting_date: v.sitting_date || docDate,
+        })),
+      };
+    }),
+  };
+}
+
 export default function LatestVotesPage() {
   return (
     <Suspense fallback={
@@ -104,7 +152,13 @@ function LatestVotesContent() {
 
   const [selectedMep, setSelectedMep] = useState<string | null>(null);
 
-  // Initialize filters from URL query params (e.g. ?search=forsvar&eurovoc=forsvarspolitik&committee=...&mep=...)
+  // Initialize filters from URL query params. When the URL matches a theme
+  // card link, swap the data source to the theme dataset and skip the
+  // search/eurovoc filter init (they describe the theme, not a user filter).
+  const themeDataset = useMemo(
+    () => matchThemeDataset(searchParams.get("search"), searchParams.get("eurovoc")),
+    [searchParams],
+  );
   const [initializedFromUrl, setInitializedFromUrl] = useState(false);
   useEffect(() => {
     if (initializedFromUrl) return;
@@ -112,14 +166,19 @@ function LatestVotesContent() {
     const qEurovoc = searchParams.get("eurovoc");
     const qCommittee = searchParams.get("committee");
     const qMep = searchParams.get("mep");
-    if (qSearch) setSearchQuery(qSearch);
-    if (qEurovoc) setSelectedEurovoc(qEurovoc);
+    if (!themeDataset) {
+      if (qSearch) setSearchQuery(qSearch);
+      if (qEurovoc) setSelectedEurovoc(qEurovoc);
+    }
     if (qCommittee) setSelectedCommittee(qCommittee);
     if (qMep) setSelectedMep(qMep);
     setInitializedFromUrl(true);
-  }, [searchParams, initializedFromUrl]);
-  const url = `/${basePath}/data/latest_votes.json`;
-  const { data, error, isLoading } = useSWR<LatestVotesData>(url, fetcher);
+  }, [searchParams, initializedFromUrl, themeDataset]);
+  const url = themeDataset
+    ? `/${basePath}/data/${themeDataset.file}`
+    : `/${basePath}/data/latest_votes.json`;
+  const { data: rawData, error, isLoading } = useSWR<LatestVotesData>(url, fetcher);
+  const data = themeDataset && rawData ? normalizeThemeData(rawData) : rawData;
 
   // Fetch disagreements data for MEP filtering
   interface Disagreement {
@@ -383,7 +442,9 @@ function LatestVotesContent() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold">Seneste afstemninger</h1>
+          <h1 className="text-3xl font-bold">
+            {themeDataset ? `Afstemninger — ${themeDataset.label}` : "Seneste afstemninger"}
+          </h1>
         </div>
 
         <FilterPanel
