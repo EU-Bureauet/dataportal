@@ -194,6 +194,7 @@ function computeDonutLayout(
   slices: Slice[],
   width: number,
   baseRgb: [number, number, number],
+  isCompact = false,
 ): DonutLayout {
   if (slices.length === 0) {
     return { labels: [] as LabelLayout[], totalVotes: 0 };
@@ -201,8 +202,12 @@ function computeDonutLayout(
 
   const totalVotes = slices.reduce((s, x) => s + x.weight, 0);
 
-  const outerRadius = Math.min(width, 520) * 0.24;
-  const verticalPadding = 36; // room for the topmost / bottommost label rows
+  // On compact (mobile) layouts, the donut takes the full width because side
+  // labels are rendered as a legend list below instead of around the chart.
+  const outerRadius = isCompact
+    ? Math.min(width, 520) * 0.36
+    : Math.min(width, 520) * 0.24;
+  const verticalPadding = isCompact ? 12 : 36; // no label rows on compact
   const height = Math.round(outerRadius * 2 + verticalPadding * 2);
   const cx = width / 2;
   const cy = height / 2;
@@ -290,6 +295,99 @@ function computeDonutLayout(
   return { labels, totalVotes, height, cx, cy, outerRadius, innerRadius };
 }
 
+interface DonutTooltipState {
+  x: number;
+  y: number;
+  text: string;
+  weight: number;
+  href?: string;
+}
+
+function CompactLegend({ labels }: Readonly<{ labels: LabelLayout[] }>) {
+  const INITIAL_COUNT = 3;
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? labels : labels.slice(0, INITIAL_COUNT);
+  const hiddenCount = labels.length - INITIAL_COUNT;
+  return (
+    <div className="mt-3">
+      <ul className="space-y-1.5">
+        {visible.map((s) => (
+          <li key={`legend-${s.key}`}>
+            <a
+              href={s.href}
+              className="flex items-start gap-2 text-xs text-gray-700 hover:text-gray-900"
+            >
+              <span
+                aria-hidden
+                className="mt-1 inline-block h-2.5 w-2.5 flex-shrink-0 rounded-sm"
+                style={{ backgroundColor: s.fillColor }}
+              />
+              <span className="flex-1 leading-snug">{s.text}</span>
+              <span className="flex-shrink-0 tabular-nums text-gray-500">
+                {s.weight.toLocaleString("da-DK")}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((prev) => !prev)}
+          className="mt-2 text-xs font-semibold text-blue-700 hover:text-blue-900 hover:underline"
+          aria-expanded={expanded}
+        >
+          {expanded ? "Vis færre" : `Vis ${hiddenCount} flere`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function DonutTooltip({
+  tooltip,
+  width,
+}: Readonly<{ tooltip: DonutTooltipState; width: number }>) {
+  // Estimate tooltip width (max-w-xs = 20rem = 320px, but on narrow containers
+  // it shrinks). We clamp positioning so the tooltip always stays inside the
+  // container regardless of where the user clicked.
+  const SIDE_PADDING = 8;
+  const estimatedWidth = Math.min(280, width - SIDE_PADDING * 2);
+  const preferredLeft = tooltip.x + 12;
+  // If placing to the right of the click would overflow, flip to the left.
+  const wouldOverflowRight = preferredLeft + estimatedWidth > width - SIDE_PADDING;
+  const flippedLeft = tooltip.x - 12 - estimatedWidth;
+  const rawLeft = wouldOverflowRight && flippedLeft >= SIDE_PADDING ? flippedLeft : preferredLeft;
+  const left = Math.max(SIDE_PADDING, Math.min(rawLeft, width - estimatedWidth - SIDE_PADDING));
+  return (
+    <div
+      role="tooltip"
+      className={`absolute z-10 rounded-md bg-gray-900 px-2.5 py-1.5 text-xs text-white shadow-lg ${
+        tooltip.href ? "" : "pointer-events-none"
+      }`}
+      style={{
+        left,
+        top: Math.max(0, tooltip.y - 8),
+        width: estimatedWidth,
+        transform: "translateY(-100%)",
+      }}
+    >
+      <div className="font-medium leading-snug">{tooltip.text}</div>
+      <div className="mt-0.5 text-[0.65rem] text-gray-300">
+        {tooltip.weight.toLocaleString("da-DK")} stemmer
+      </div>
+      {tooltip.href && (
+        <a
+          href={tooltip.href}
+          className="mt-1.5 inline-block text-[0.7rem] font-semibold text-blue-300 underline underline-offset-2 hover:text-blue-200"
+        >
+          Se afstemninger →
+        </a>
+      )}
+    </div>
+  );
+}
+
 export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSearch, latestVotesEurovoc }: ThemeDonutChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(640);
@@ -299,8 +397,10 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
   // has mounted and measured its container on the client.
   const [mounted, setMounted] = useState(false);
   // Custom tooltip state — tracked relative to the wrapper div so the tooltip
-  // can be absolutely-positioned next to the cursor.
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string; weight: number } | null>(null);
+  // can be absolutely-positioned next to the cursor. When `href` is set the
+  // tooltip is rendered in interactive mode (used on touch devices so the
+  // first tap shows the tooltip and the user explicitly taps a link inside).
+  const [tooltip, setTooltip] = useState<DonutTooltipState | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
   // Factory that returns an SVG mouse handler which positions the custom
@@ -345,7 +445,7 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
   }, []);
 
   const layout = useMemo(
-    () => computeDonutLayout(slices, width, baseRgb),
+    () => computeDonutLayout(slices, width, baseRgb, width < 480),
     [slices, width, baseRgb],
   );
 
@@ -384,6 +484,7 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
             Afstemninger i temaet
           </h3>
           {(() => {
+            if (width < 480) return null; // legend list below shows everything on mobile
             const hidden = layout.labels.filter((l) => !l.showLabel).length;
             if (hidden === 0) return null;
             return (
@@ -397,6 +498,14 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
             className="mt-1 w-full relative"
             style={{ minHeight: height }}
             onMouseLeave={() => setTooltip(null)}
+            onPointerDown={(e) => {
+              // Dismiss an interactive (touch) tooltip if the user taps the
+              // wrapper outside the tooltip itself.
+              if (!tooltip?.href) return;
+              const target = e.target as HTMLElement;
+              if (target.closest('[role="tooltip"]')) return;
+              setTooltip(null);
+            }}
           >
             {mounted && (
             <svg
@@ -432,8 +541,27 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
                   const popDist = 6;
                   const popX = isHovered ? Math.sin(s.midAngle) * popDist : 0;
                   const popY = isHovered ? -Math.cos(s.midAngle) * popDist : 0;
+                  // On touch / coarse-pointer devices, intercept the slice
+                  // click: the first tap shows the tooltip with an explicit
+                  // link inside; the user taps that link to navigate.
+                  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+                    if (globalThis.window === undefined) return;
+                    const isCoarse = globalThis.window.matchMedia?.("(pointer: coarse)").matches;
+                    if (!isCoarse) return;
+                    if (tooltip?.href === s.href) return; // already shown -> let link handle it
+                    e.preventDefault();
+                    const rect = containerRef.current?.getBoundingClientRect();
+                    if (!rect) return;
+                    setTooltip({
+                      x: e.clientX - rect.left,
+                      y: e.clientY - rect.top,
+                      text: s.text,
+                      weight: s.weight,
+                      href: s.href,
+                    });
+                  };
                   return (
-                    <a key={s.key} href={s.href}>
+                    <a key={s.key} href={s.href} onClick={handleClick}>
                       <path
                         d={d ?? undefined}
                         fill={s.fillColor}
@@ -459,82 +587,99 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
                 })}
               </g>
 
-              {/* Center label: total votes */}
-              <g transform={`translate(${layout.cx}, ${layout.cy})`}>
-                <text
-                  textAnchor="middle"
-                  dy="-0.15em"
-                  style={{
-                    fontSize: "2rem",
-                    fontWeight: 800,
-                    fill: rgbCss(darken(baseRgb, 0.15)),
-                    letterSpacing: "-0.02em",
-                  }}
-                >
-                  {layout.totalVotes.toLocaleString("da-DK")}
-                </text>
-                <text
-                  textAnchor="middle"
-                  dy="1.2em"
-                  style={{ fontSize: "0.75rem", fill: "#6b7280", letterSpacing: "0.08em", textTransform: "uppercase" }}
-                >
-                  Stemmer i alt
-                </text>
-              </g>
-
-              {/* Leader lines + labels */}
-              <g>
-                {layout.labels.filter((s) => s.showLabel).map((s) => {
-                  const showTooltip = makeTooltipHandler(s.text, s.weight);
-                  return (
-                  <g key={`label-${s.key}`}>
-                    <polyline
-                      points={`${s.arcX},${s.arcY} ${s.bendX},${s.bendY} ${s.textX},${s.textY}`}
-                      fill="none"
-                      stroke={s.fillColor}
-                      strokeWidth={1}
-                    />
-                    <a href={s.href}>
-                      <text
-                        x={s.textX + (s.textAnchor === "start" ? 4 : -4)}
-                        y={s.textY}
-                        textAnchor={s.textAnchor}
-                        dominantBaseline="middle"
-                        style={{
-                          fontSize: "0.72rem",
-                          fontWeight: 500,
-                          fill: "#374151",
-                          cursor: "pointer",
-                        }}
-                        onMouseEnter={showTooltip}
-                        onMouseMove={showTooltip}
-                        onMouseLeave={() => setTooltip(null)}
-                      >
-                        {s.displayText}
-                      </text>
-                    </a>
+              {/* Center label: total votes. Font sizes scale with the donut's
+                  inner radius so the text stays proportional on small/mobile
+                  containers (the SVG uses viewBox=width:height 1:1, so CSS
+                  rem units would not shrink with the donut). The number's
+                  size is also constrained horizontally so multi-digit totals
+                  always fit inside the inner circle. */}
+              {(() => {
+                const innerR = layout.innerRadius ?? 60;
+                const totalText = layout.totalVotes.toLocaleString("da-DK");
+                // Available width inside the inner circle (with a little side padding).
+                const maxTextWidth = innerR * 2 * 0.82;
+                // Approx average glyph width ratio for a bold sans-serif numeral.
+                const widthBasedFontSize = maxTextWidth / Math.max(1, totalText.length * 0.6);
+                const radiusBasedFontSize = innerR * 0.55;
+                const numberFontSize = Math.max(14, Math.min(34, widthBasedFontSize, radiusBasedFontSize));
+                const labelFontSize = Math.max(8, Math.min(12, innerR * 0.18));
+                return (
+                  <g transform={`translate(${layout.cx}, ${layout.cy})`}>
+                    <text
+                      textAnchor="middle"
+                      dy="-0.15em"
+                      style={{
+                        fontSize: `${numberFontSize}px`,
+                        fontWeight: 800,
+                        fill: rgbCss(darken(baseRgb, 0.15)),
+                        letterSpacing: "-0.02em",
+                      }}
+                    >
+                      {totalText}
+                    </text>
+                    <text
+                      textAnchor="middle"
+                      dy="1.2em"
+                      style={{
+                        fontSize: `${labelFontSize}px`,
+                        fill: "#6b7280",
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Stemmer i alt
+                    </text>
                   </g>
-                  );
-                })}
-              </g>
+                );
+              })()}
+
+              {/* Leader lines + labels (hidden on compact/mobile widths
+                  where they would overflow the card; a legend list is
+                  rendered below the SVG instead). */}
+              {width >= 480 && (
+                <g>
+                  {layout.labels.filter((s) => s.showLabel).map((s) => {
+                    const showTooltip = makeTooltipHandler(s.text, s.weight);
+                    return (
+                    <g key={`label-${s.key}`}>
+                      <polyline
+                        points={`${s.arcX},${s.arcY} ${s.bendX},${s.bendY} ${s.textX},${s.textY}`}
+                        fill="none"
+                        stroke={s.fillColor}
+                        strokeWidth={1}
+                      />
+                      <a href={s.href}>
+                        <text
+                          x={s.textX + (s.textAnchor === "start" ? 4 : -4)}
+                          y={s.textY}
+                          textAnchor={s.textAnchor}
+                          dominantBaseline="middle"
+                          style={{
+                            fontSize: "0.72rem",
+                            fontWeight: 500,
+                            fill: "#374151",
+                            cursor: "pointer",
+                          }}
+                          onMouseEnter={showTooltip}
+                          onMouseMove={showTooltip}
+                          onMouseLeave={() => setTooltip(null)}
+                        >
+                          {s.displayText}
+                        </text>
+                      </a>
+                    </g>
+                    );
+                  })}
+                </g>
+              )}
             </svg>
             )}
-            {tooltip && (
-              <div
-                role="tooltip"
-                className="pointer-events-none absolute z-10 max-w-xs rounded-md bg-gray-900 px-2.5 py-1.5 text-xs text-white shadow-lg"
-                style={{
-                  left: Math.min(tooltip.x + 12, width - 16),
-                  top: Math.max(0, tooltip.y - 8),
-                  transform: tooltip.x > width - 220 ? "translate(-100%, -100%)" : "translateY(-100%)",
-                }}
-              >
-                <div className="font-medium leading-snug">{tooltip.text}</div>
-                <div className="mt-0.5 text-[0.65rem] text-gray-300">
-                  {tooltip.weight.toLocaleString("da-DK")} stemmer
-                </div>
-              </div>
+            {/* Compact legend list shown on narrow viewports in place of the
+                side labels. Each row links to the same deep-link as the slice. */}
+            {mounted && width < 480 && layout.labels.length > 0 && (
+              <CompactLegend labels={layout.labels} />
             )}
+            {tooltip && <DonutTooltip tooltip={tooltip} width={width} />}
           </div>
         </>
       )}
