@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as d3 from "d3";
 
 interface ThemeVoteSubVote {
@@ -161,6 +161,119 @@ function truncateToWidth(text: string, maxPx: number, fontSizePx: number): strin
   return truncate(text, maxChars);
 }
 
+interface DonutLayout {
+  labels: LabelLayout[];
+  totalVotes: number;
+  height?: number;
+  cx?: number;
+  cy?: number;
+  outerRadius?: number;
+  innerRadius?: number;
+}
+
+/** Compute the full donut layout: pie geometry, palette assignment, label
+ * collision avoidance, and width-based label truncation. Pulled out of the
+ * component to keep `ThemeDonutChart`'s body small. */
+function computeDonutLayout(
+  slices: Slice[],
+  width: number,
+  baseRgb: [number, number, number],
+): DonutLayout {
+  if (slices.length === 0) {
+    return { labels: [] as LabelLayout[], totalVotes: 0 };
+  }
+
+  const totalVotes = slices.reduce((s, x) => s + x.weight, 0);
+
+  const outerRadius = Math.min(width, 520) * 0.24;
+  const verticalPadding = 36; // room for the topmost / bottommost label rows
+  const height = Math.round(outerRadius * 2 + verticalPadding * 2);
+  const cx = width / 2;
+  const cy = height / 2;
+  const innerRadius = outerRadius * 0.6;
+  const tickEnd = outerRadius + 12;
+  const labelX = Math.min(width / 2 - 8, outerRadius + 80);
+
+  const MIN_LABEL_SHARE = 0.015;
+  const LABEL_LINE_HEIGHT = 14;
+  const LABEL_FONT_PX = 11.5;
+  const SIDE_PADDING = 8;
+
+  const pieGen = d3
+    .pie<Slice>()
+    .value((d) => d.weight)
+    .sort(null)
+    .padAngle(0.005);
+
+  const arcs = pieGen(slices);
+
+  const PALETTE_STEPS = 7;
+  const palette = buildPalette(baseRgb, PALETTE_STEPS);
+  const paletteAssignments = assignPaletteIndices(slices.length, PALETTE_STEPS);
+
+  const labels: LabelLayout[] = arcs.map((a, i) => {
+    const midAngle = (a.startAngle + a.endAngle) / 2;
+    const sin = Math.sin(midAngle);
+    const cos = Math.cos(midAngle);
+    const arcX = cx + sin * outerRadius;
+    const arcY = cy - cos * outerRadius;
+    const bendX = cx + sin * tickEnd;
+    const bendY = cy - cos * tickEnd;
+    const onRight = sin >= 0;
+    const textX = onRight ? cx + labelX : cx - labelX;
+    const textY = bendY;
+    const share = a.data.weight / totalVotes;
+    const fillColor = palette[paletteAssignments[i]];
+    const maxLabelWidth = onRight
+      ? width - textX - SIDE_PADDING
+      : textX - SIDE_PADDING;
+
+    return {
+      ...a.data,
+      startAngle: a.startAngle,
+      endAngle: a.endAngle,
+      midAngle,
+      arcX,
+      arcY,
+      bendX,
+      bendY,
+      textX,
+      textY,
+      textAnchor: onRight ? "start" : "end",
+      fillColor,
+      showLabel: share >= MIN_LABEL_SHARE,
+      maxLabelWidth: Math.max(40, maxLabelWidth),
+      displayText: a.data.text,
+    };
+  });
+
+  // Collision avoidance per side.
+  const placeSide = (side: "left" | "right") => {
+    const onSide = labels
+      .filter((l) => (side === "right" ? l.textAnchor === "start" : l.textAnchor === "end"))
+      .sort((a, b) => a.textY - b.textY);
+    let lastY = Number.NEGATIVE_INFINITY;
+    for (const l of onSide) {
+      if (!l.showLabel) continue;
+      if (l.textY - lastY < LABEL_LINE_HEIGHT) {
+        l.showLabel = false;
+      } else {
+        lastY = l.textY;
+      }
+    }
+  };
+  placeSide("left");
+  placeSide("right");
+
+  // Width-based truncation for surviving labels.
+  for (const l of labels) {
+    if (!l.showLabel) continue;
+    l.displayText = truncateToWidth(l.text, l.maxLabelWidth, LABEL_FONT_PX);
+  }
+
+  return { labels, totalVotes, height, cx, cy, outerRadius, innerRadius };
+}
+
 export function ThemeDonutChart({ data, accentColor = "#1d4ed8" }: ThemeDonutChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(640);
@@ -173,6 +286,24 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8" }: ThemeDonutCha
   // can be absolutely-positioned next to the cursor.
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string; weight: number } | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+
+  // Factory that returns an SVG mouse handler which positions the custom
+  // tooltip relative to the chart container. Defined once and reused by
+  // both donut slices and labels.
+  const makeTooltipHandler = useCallback(
+    (text: string, weight: number) =>
+      (e: React.MouseEvent<SVGElement>) => {
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        setTooltip({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+          text,
+          weight,
+        });
+      },
+    [],
+  );
 
   const meta = data.metadata ?? {};
   const slices = useMemo(() => buildSlices(data.documents ?? []), [data.documents]);
@@ -194,120 +325,10 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8" }: ThemeDonutCha
     return () => ro.disconnect();
   }, []);
 
-  const layout = useMemo(() => {
-    if (slices.length === 0) {
-      return { labels: [] as LabelLayout[], totalVotes: 0 };
-    }
-
-    const totalVotes = slices.reduce((s, x) => s + x.weight, 0);
-
-    // Donut radius derived from width; height is sized to fit the donut plus
-    // a small margin for top/bottom labels. This keeps the card compact and
-    // avoids large empty bands above and below the chart.
-    const outerRadius = Math.min(width, 520) * 0.24;
-    const verticalPadding = 36; // room for the topmost / bottommost label rows
-    const height = Math.round(outerRadius * 2 + verticalPadding * 2);
-    const cx = width / 2;
-    const cy = height / 2;
-    const innerRadius = outerRadius * 0.6;
-    const tickEnd = outerRadius + 12;
-    const labelX = Math.min(width / 2 - 8, outerRadius + 80);
-
-    // Hide labels for slices smaller than this share of the total. Tiny slivers
-    // would otherwise crowd the rim with overlapping text.
-    const MIN_LABEL_SHARE = 0.015; // 1.5%
-    // Vertical spacing required between two adjacent labels on the same side.
-    const LABEL_LINE_HEIGHT = 14;
-    // Font size used for labels (must match the <text> style below).
-    const LABEL_FONT_PX = 11.5;
-    // Horizontal padding between text and the side of the SVG.
-    const SIDE_PADDING = 8;
-
-    const pieGen = d3
-      .pie<Slice>()
-      .value((d) => d.weight)
-      .sort(null)
-      .padAngle(0.005);
-
-    const arcs = pieGen(slices);
-
-    // Build a discrete palette of shades and assign one to each slice via an
-    // interleaved pattern, so adjacent slices look distinct rather than
-    // imperceptibly different.
-    const PALETTE_STEPS = 7;
-    const palette = buildPalette(baseRgb, PALETTE_STEPS);
-    const paletteAssignments = assignPaletteIndices(slices.length, PALETTE_STEPS);
-
-    // First pass: compute geometry and a tentative `showLabel` based on slice size.
-    const labels: LabelLayout[] = arcs.map((a, i) => {
-      const midAngle = (a.startAngle + a.endAngle) / 2;
-      const sin = Math.sin(midAngle);
-      const cos = Math.cos(midAngle);
-      const arcX = cx + sin * outerRadius;
-      const arcY = cy - cos * outerRadius;
-      const bendX = cx + sin * tickEnd;
-      const bendY = cy - cos * tickEnd;
-      const onRight = sin >= 0;
-      const textX = onRight ? cx + labelX : cx - labelX;
-      const textY = bendY;
-      const rank = (slices.length - 1 - i) / Math.max(1, slices.length - 1);
-      const share = a.data.weight / totalVotes;
-      void rank;
-      const fillColor = palette[paletteAssignments[i]];
-
-      // Available text width = distance from the label anchor to the SVG edge.
-      const maxLabelWidth = onRight
-        ? width - textX - SIDE_PADDING
-        : textX - SIDE_PADDING;
-
-      return {
-        ...a.data,
-        startAngle: a.startAngle,
-        endAngle: a.endAngle,
-        midAngle,
-        arcX,
-        arcY,
-        bendX,
-        bendY,
-        textX,
-        textY,
-        textAnchor: onRight ? "start" : "end",
-        fillColor,
-        showLabel: share >= MIN_LABEL_SHARE,
-        maxLabelWidth: Math.max(40, maxLabelWidth),
-        displayText: a.data.text,
-      };
-    });
-
-    // Second pass: collision avoidance per side. Walk top-to-bottom and hide
-    // labels whose Y position is too close to the previously-shown label.
-    const placeSide = (side: "left" | "right") => {
-      const onSide = labels
-        .map((l, idx) => ({ l, idx }))
-        .filter(({ l }) => (side === "right" ? l.textAnchor === "start" : l.textAnchor === "end"))
-        .sort((a, b) => a.l.textY - b.l.textY);
-
-      let lastY = Number.NEGATIVE_INFINITY;
-      for (const { l } of onSide) {
-        if (!l.showLabel) continue;
-        if (l.textY - lastY < LABEL_LINE_HEIGHT) {
-          l.showLabel = false;
-        } else {
-          lastY = l.textY;
-        }
-      }
-    };
-    placeSide("left");
-    placeSide("right");
-
-    // Third pass: width-based truncation for the labels that survived.
-    for (const l of labels) {
-      if (!l.showLabel) continue;
-      l.displayText = truncateToWidth(l.text, l.maxLabelWidth, LABEL_FONT_PX);
-    }
-
-    return { labels, totalVotes, height, cx, cy, outerRadius, innerRadius };
-  }, [slices, width, baseRgb]);
+  const layout = useMemo(
+    () => computeDonutLayout(slices, width, baseRgb),
+    [slices, width, baseRgb],
+  );
 
   const arcGen = useMemo(() => {
     if (!layout.outerRadius) return null;
@@ -385,16 +406,7 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8" }: ThemeDonutCha
               <g transform={`translate(${layout.cx}, ${layout.cy})`} filter="url(#theme-donut-shadow)">
                 {layout.labels.map((s) => {
                   const d = arcGen({ ...s } as LabelLayout);
-                  const showTooltip = (e: React.MouseEvent<SVGElement>) => {
-                    const rect = containerRef.current?.getBoundingClientRect();
-                    if (!rect) return;
-                    setTooltip({
-                      x: e.clientX - rect.left,
-                      y: e.clientY - rect.top,
-                      text: s.text,
-                      weight: s.weight,
-                    });
-                  };
+                  const showTooltip = makeTooltipHandler(s.text, s.weight);
                   const isHovered = hoveredKey === s.key;
                   // Pop the hovered slice slightly outward along its mid-angle
                   // for a tactile, professional feel.
@@ -454,16 +466,7 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8" }: ThemeDonutCha
               {/* Leader lines + labels */}
               <g>
                 {layout.labels.filter((s) => s.showLabel).map((s) => {
-                  const showTooltip = (e: React.MouseEvent<SVGElement>) => {
-                    const rect = containerRef.current?.getBoundingClientRect();
-                    if (!rect) return;
-                    setTooltip({
-                      x: e.clientX - rect.left,
-                      y: e.clientY - rect.top,
-                      text: s.text,
-                      weight: s.weight,
-                    });
-                  };
+                  const showTooltip = makeTooltipHandler(s.text, s.weight);
                   return (
                   <g key={`label-${s.key}`}>
                     <polyline
