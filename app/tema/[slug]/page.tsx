@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { HeroSection } from "@/components/hero-section";
 import { ThemeArticles } from "@/components/theme-articles";
 import { VisualisationCard } from "@/components/visualisation-card";
-import { ParliamentHemicycle } from "@/components/parliament-hemicycle";
+import { ThemeDonutChart, type ThemeVotesData } from "@/components/theme-donut-chart";
 
 interface ThemeArticle {
   id: string;
@@ -202,6 +202,39 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
 
   const articles = getThemeArticles(theme.articleFilter);
 
+  // Map theme slug -> Tailwind gradient classes, matching the colors used on the
+  // ThemeExplorationCards on the dataportal landing page.
+  const themeGradients: Record<string, string> = {
+    forsvar: "from-blue-600 to-blue-800",
+    miljoe: "from-green-600 to-emerald-800",
+    energi: "from-amber-600 to-orange-800",
+  };
+  const themeGradient = themeGradients[theme.slug];
+
+  // Per-theme accent color (hex) for the tag cloud, matching each theme's palette.
+  const themeAccentColors: Record<string, string> = {
+    forsvar: "#1d4ed8", // blue-700
+    miljoe: "#047857", // emerald-700
+    energi: "#b45309", // amber-700
+  };
+  const themeAccentColor = themeAccentColors[theme.slug] ?? themeAccentColors.forsvar;
+
+  // Load tag-cloud data for this theme. Filename mapping keeps the JSON
+  // files self-contained and avoids touching the existing themes/*.json.
+  const themeVotesFiles: Record<string, string> = {
+    forsvar: "theme_votes_forsvar_sikkerhed.json",
+    miljoe: "theme_votes_miljo_sundhed.json",
+    energi: "theme_votes_energi_industri.json",
+  };
+  let themeVotesData: ThemeVotesData | null = null;
+  const themeVotesFilename = themeVotesFiles[theme.slug];
+  if (themeVotesFilename) {
+    const themeVotesPath = path.join(process.cwd(), "data", themeVotesFilename);
+    if (fs.existsSync(themeVotesPath)) {
+      themeVotesData = JSON.parse(fs.readFileSync(themeVotesPath, "utf-8")) as ThemeVotesData;
+    }
+  }
+
   return (
     <div>
       {/* Hero — full width, sits right below the sticky nav */}
@@ -230,14 +263,20 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
                   description={vis.description}
                   href={vis.href}
                   subDescription={generateSubDescription(vis)}
+                  themeGradient={themeGradient}
                 />
               ))}
             </div>
 
-            {/* Parliament hemicycle — aligned with the visualisation cards */}
-            <div className="mt-8 bg-white rounded-xl shadow-md border border-gray-100 p-6 sm:p-8">
-              <ParliamentHemicycle />
-            </div>
+            {/* Donut chart over the votes that make up this theme. */}
+            {themeVotesData && (
+              <div className="mt-4 bg-white rounded-xl shadow-md border border-gray-100 px-6 sm:px-8 py-3 sm:py-4">
+                <ThemeDonutChart
+                  data={themeVotesData}
+                  accentColor={themeAccentColor}
+                />
+              </div>
+            )}
           </section>
         </div>
       </div>

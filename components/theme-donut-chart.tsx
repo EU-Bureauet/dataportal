@@ -1,0 +1,535 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import * as d3 from "d3";
+
+interface ThemeVoteSubVote {
+  for?: number;
+  against?: number;
+  abstention?: number;
+}
+
+interface ThemeVoteDocument {
+  document_reference: string;
+  short_title: string;
+  voteCount?: number;
+  votes?: ThemeVoteSubVote[];
+}
+
+interface ThemeVotesMetadata {
+  theme_label?: string;
+  theme_definition?: string;
+  theme_description?: string;
+}
+
+export interface ThemeVotesData {
+  metadata?: ThemeVotesMetadata;
+  documents?: ThemeVoteDocument[];
+}
+
+interface ThemeDonutChartProps {
+  data: ThemeVotesData;
+  /** Hex color used as the base for the donut. Variations are derived from it. */
+  accentColor?: string;
+}
+
+interface Slice {
+  key: string;
+  text: string;
+  href: string;
+  weight: number;
+}
+
+interface LabelLayout extends Slice {
+  startAngle: number;
+  endAngle: number;
+  midAngle: number;
+  // Anchor on the outer arc (where the leader line begins)
+  arcX: number;
+  arcY: number;
+  // Bend point for the leader line
+  bendX: number;
+  bendY: number;
+  // Label text anchor
+  textX: number;
+  textY: number;
+  textAnchor: "start" | "end";
+  fillColor: string;
+  // Whether the label (text + leader line) should be rendered. Tiny slices and
+  // slices that would overlap a previously-placed label are hidden, but the
+  // donut slice itself remains interactive (tooltip on hover).
+  showLabel: boolean;
+  // Maximum width in pixels available for the label text. Used to truncate.
+  maxLabelWidth: number;
+  // Possibly-truncated label text shown next to the leader line. The original
+  // full phrase is kept on `text` for the tooltip.
+  displayText: string;
+}
+
+function buildSlices(docs: ThemeVoteDocument[]): Slice[] {
+  const map = new Map<string, Slice>();
+  for (const doc of docs) {
+    const label = (doc.short_title || "").trim();
+    if (!label) continue;
+    let weight = 0;
+    if (doc.votes && doc.votes.length > 0) {
+      for (const v of doc.votes) {
+        weight += (v.for ?? 0) + (v.against ?? 0) + (v.abstention ?? 0);
+      }
+    }
+    if (weight === 0) weight = doc.voteCount ?? 1;
+
+    const existing = map.get(label);
+    if (existing) {
+      existing.weight += weight;
+    } else {
+      map.set(label, {
+        key: doc.document_reference || label,
+        text: label,
+        weight,
+        href: `/latest-votes?search=${encodeURIComponent(label)}`,
+      });
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.weight - a.weight);
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  const v = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const num = Number.parseInt(v, 16);
+  return [(num >> 16) & 0xff, (num >> 8) & 0xff, num & 0xff];
+}
+
+function rgbCss([r, g, b]: [number, number, number]): string {
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function lighten([r, g, b]: [number, number, number], amount: number): [number, number, number] {
+  return [r + (255 - r) * amount, g + (255 - g) * amount, b + (255 - b) * amount];
+}
+
+function darken([r, g, b]: [number, number, number], amount: number): [number, number, number] {
+  return [r * (1 - amount), g * (1 - amount), b * (1 - amount)];
+}
+
+/** Builds a discrete palette of N shades within the accent color hue. The
+ * palette goes from a soft tint (mostly white) down to a deeply darkened
+ * version, giving a wide visual range while staying on-theme. */
+function buildPalette(baseRgb: [number, number, number], steps: number): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < steps; i++) {
+    const t = steps === 1 ? 0.5 : i / (steps - 1); // 0..1
+    // Map t -> shift -0.55 (lighten 55%) .. +0.30 (darken 30%).
+    const shift = -0.55 + t * 0.85;
+    const rgb = shift < 0 ? lighten(baseRgb, -shift) : darken(baseRgb, shift);
+    out.push(rgbCss(rgb));
+  }
+  return out;
+}
+
+/** Assigns palette indices to slices so adjacent slices have visually distinct
+ * colors. Slices are sorted by weight (largest first); we interleave palette
+ * positions instead of walking them sequentially so neighbours don't look like
+ * the same shade. */
+function assignPaletteIndices(count: number, paletteSize: number): number[] {
+  const result: number[] = new Array(count);
+  // For each slice index i, pick a palette index that varies in a non-monotonic
+  // way: alternate between large jumps so neighbours differ noticeably.
+  for (let i = 0; i < count; i++) {
+    // Largest slices (low i) -> darker shades (high palette index).
+    // We stagger by 2 to create a zig-zag pattern through the palette.
+    const base = paletteSize - 1 - Math.floor((i * 2) % paletteSize);
+    // Add a small offset every other slice to break perfect repetition.
+    const offset = i % 2 === 0 ? 0 : Math.floor(paletteSize / 4);
+    result[i] = Math.max(0, Math.min(paletteSize - 1, base - offset));
+  }
+  return result;
+}
+
+function truncate(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1).trimEnd()}…`;
+}
+
+/** Truncate `text` so that it fits within `maxPx` pixels at the given font size.
+ * Uses an approximate average character width (suitable for 11–12 px sans-serif). */
+function truncateToWidth(text: string, maxPx: number, fontSizePx: number): string {
+  // Average glyph width ratio for Inter / system sans at small sizes.
+  const avgCharWidth = fontSizePx * 0.55;
+  const maxChars = Math.max(6, Math.floor(maxPx / avgCharWidth));
+  return truncate(text, maxChars);
+}
+
+export function ThemeDonutChart({ data, accentColor = "#1d4ed8" }: ThemeDonutChartProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(640);
+  // Avoid SSR/CSR hydration mismatches: the SVG is layout-dependent on the
+  // measured container width and uses floating-point math that can differ from
+  // the server's default width. We only render the chart after the component
+  // has mounted and measured its container on the client.
+  const [mounted, setMounted] = useState(false);
+  // Custom tooltip state — tracked relative to the wrapper div so the tooltip
+  // can be absolutely-positioned next to the cursor.
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string; weight: number } | null>(null);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+
+  const meta = data.metadata ?? {};
+  const slices = useMemo(() => buildSlices(data.documents ?? []), [data.documents]);
+  const baseRgb = useMemo(() => hexToRgb(accentColor), [accentColor]);
+
+  // Track container width so the chart is responsive.
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+    setMounted(true);
+    setWidth(Math.max(320, Math.floor(el.getBoundingClientRect().width)));
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = Math.max(320, Math.floor(entry.contentRect.width));
+        setWidth(w);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const layout = useMemo(() => {
+    if (slices.length === 0) {
+      return { labels: [] as LabelLayout[], totalVotes: 0 };
+    }
+
+    const totalVotes = slices.reduce((s, x) => s + x.weight, 0);
+
+    // Donut radius derived from width; height is sized to fit the donut plus
+    // a small margin for top/bottom labels. This keeps the card compact and
+    // avoids large empty bands above and below the chart.
+    const outerRadius = Math.min(width, 520) * 0.24;
+    const verticalPadding = 36; // room for the topmost / bottommost label rows
+    const height = Math.round(outerRadius * 2 + verticalPadding * 2);
+    const cx = width / 2;
+    const cy = height / 2;
+    const innerRadius = outerRadius * 0.6;
+    const tickEnd = outerRadius + 12;
+    const labelX = Math.min(width / 2 - 8, outerRadius + 80);
+
+    // Hide labels for slices smaller than this share of the total. Tiny slivers
+    // would otherwise crowd the rim with overlapping text.
+    const MIN_LABEL_SHARE = 0.015; // 1.5%
+    // Vertical spacing required between two adjacent labels on the same side.
+    const LABEL_LINE_HEIGHT = 14;
+    // Font size used for labels (must match the <text> style below).
+    const LABEL_FONT_PX = 11.5;
+    // Horizontal padding between text and the side of the SVG.
+    const SIDE_PADDING = 8;
+
+    const pieGen = d3
+      .pie<Slice>()
+      .value((d) => d.weight)
+      .sort(null)
+      .padAngle(0.005);
+
+    const arcs = pieGen(slices);
+
+    // Build a discrete palette of shades and assign one to each slice via an
+    // interleaved pattern, so adjacent slices look distinct rather than
+    // imperceptibly different.
+    const PALETTE_STEPS = 7;
+    const palette = buildPalette(baseRgb, PALETTE_STEPS);
+    const paletteAssignments = assignPaletteIndices(slices.length, PALETTE_STEPS);
+
+    // First pass: compute geometry and a tentative `showLabel` based on slice size.
+    const labels: LabelLayout[] = arcs.map((a, i) => {
+      const midAngle = (a.startAngle + a.endAngle) / 2;
+      const sin = Math.sin(midAngle);
+      const cos = Math.cos(midAngle);
+      const arcX = cx + sin * outerRadius;
+      const arcY = cy - cos * outerRadius;
+      const bendX = cx + sin * tickEnd;
+      const bendY = cy - cos * tickEnd;
+      const onRight = sin >= 0;
+      const textX = onRight ? cx + labelX : cx - labelX;
+      const textY = bendY;
+      const rank = (slices.length - 1 - i) / Math.max(1, slices.length - 1);
+      const share = a.data.weight / totalVotes;
+      void rank;
+      const fillColor = palette[paletteAssignments[i]];
+
+      // Available text width = distance from the label anchor to the SVG edge.
+      const maxLabelWidth = onRight
+        ? width - textX - SIDE_PADDING
+        : textX - SIDE_PADDING;
+
+      return {
+        ...a.data,
+        startAngle: a.startAngle,
+        endAngle: a.endAngle,
+        midAngle,
+        arcX,
+        arcY,
+        bendX,
+        bendY,
+        textX,
+        textY,
+        textAnchor: onRight ? "start" : "end",
+        fillColor,
+        showLabel: share >= MIN_LABEL_SHARE,
+        maxLabelWidth: Math.max(40, maxLabelWidth),
+        displayText: a.data.text,
+      };
+    });
+
+    // Second pass: collision avoidance per side. Walk top-to-bottom and hide
+    // labels whose Y position is too close to the previously-shown label.
+    const placeSide = (side: "left" | "right") => {
+      const onSide = labels
+        .map((l, idx) => ({ l, idx }))
+        .filter(({ l }) => (side === "right" ? l.textAnchor === "start" : l.textAnchor === "end"))
+        .sort((a, b) => a.l.textY - b.l.textY);
+
+      let lastY = Number.NEGATIVE_INFINITY;
+      for (const { l } of onSide) {
+        if (!l.showLabel) continue;
+        if (l.textY - lastY < LABEL_LINE_HEIGHT) {
+          l.showLabel = false;
+        } else {
+          lastY = l.textY;
+        }
+      }
+    };
+    placeSide("left");
+    placeSide("right");
+
+    // Third pass: width-based truncation for the labels that survived.
+    for (const l of labels) {
+      if (!l.showLabel) continue;
+      l.displayText = truncateToWidth(l.text, l.maxLabelWidth, LABEL_FONT_PX);
+    }
+
+    return { labels, totalVotes, height, cx, cy, outerRadius, innerRadius };
+  }, [slices, width, baseRgb]);
+
+  const arcGen = useMemo(() => {
+    if (!layout.outerRadius) return null;
+    return d3
+      .arc<LabelLayout>()
+      .innerRadius(layout.innerRadius!)
+      .outerRadius(layout.outerRadius)
+      .padAngle(0.005)
+      .cornerRadius(2);
+  }, [layout.outerRadius, layout.innerRadius]);
+
+  const height = layout.height ?? Math.round(width * 0.7);
+  const baseRgbForBg = baseRgb;
+  const definitionBg = `rgba(${baseRgbForBg[0]}, ${baseRgbForBg[1]}, ${baseRgbForBg[2]}, 0.06)`;
+  const definitionBorder = `rgba(${baseRgbForBg[0]}, ${baseRgbForBg[1]}, ${baseRgbForBg[2]}, 0.4)`;
+
+  return (
+    <div>
+      {meta.theme_description && (
+        <>
+          <p className="text-base font-semibold leading-snug text-gray-900">
+            {meta.theme_description}
+          </p>
+          <div
+            className="mt-2 h-[2px] w-16 rounded-full"
+            style={{ backgroundColor: rgbCss(baseRgb) }}
+          />
+        </>
+      )}
+
+      {layout.labels.length > 0 && arcGen && (
+        <>
+          <h3 className="mt-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
+            Afstemninger i temaet
+          </h3>
+          {(() => {
+            const hidden = layout.labels.filter((l) => !l.showLabel).length;
+            if (hidden === 0) return null;
+            return (
+              <p className="mt-1 text-[0.7rem] text-gray-400">
+                {hidden} mindre afstemning{hidden === 1 ? "" : "er"} vises uden navn — hold musen over en bid for at se den.
+              </p>
+            );
+          })()}
+          <div
+            ref={containerRef}
+            className="mt-1 w-full relative"
+            style={{ minHeight: height }}
+            onMouseLeave={() => setTooltip(null)}
+          >
+            {mounted && (
+            <svg
+              width={width}
+              height={height}
+              viewBox={`0 0 ${width} ${height}`}
+              className="block w-full h-auto"
+              aria-label="Donut chart over afstemninger i temaet"
+            >
+              {/* Soft drop shadow for the donut, gives the chart depth. */}
+              <defs>
+                <filter id="theme-donut-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
+                  <feOffset dx="0" dy="2" result="offsetblur" />
+                  <feComponentTransfer>
+                    <feFuncA type="linear" slope="0.18" />
+                  </feComponentTransfer>
+                  <feMerge>
+                    <feMergeNode />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+
+              {/* Donut slices */}
+              <g transform={`translate(${layout.cx}, ${layout.cy})`} filter="url(#theme-donut-shadow)">
+                {layout.labels.map((s) => {
+                  const d = arcGen({ ...s } as LabelLayout);
+                  const showTooltip = (e: React.MouseEvent<SVGElement>) => {
+                    const rect = containerRef.current?.getBoundingClientRect();
+                    if (!rect) return;
+                    setTooltip({
+                      x: e.clientX - rect.left,
+                      y: e.clientY - rect.top,
+                      text: s.text,
+                      weight: s.weight,
+                    });
+                  };
+                  const isHovered = hoveredKey === s.key;
+                  // Pop the hovered slice slightly outward along its mid-angle
+                  // for a tactile, professional feel.
+                  const popDist = 6;
+                  const popX = isHovered ? Math.sin(s.midAngle) * popDist : 0;
+                  const popY = isHovered ? -Math.cos(s.midAngle) * popDist : 0;
+                  return (
+                    <a key={s.key} href={s.href}>
+                      <path
+                        d={d ?? undefined}
+                        fill={s.fillColor}
+                        stroke="#ffffff"
+                        strokeWidth={isHovered ? 2 : 1.25}
+                        style={{
+                          cursor: "pointer",
+                          transform: `translate(${popX}px, ${popY}px)`,
+                          transition: "transform 180ms ease-out, stroke-width 150ms ease-out",
+                        }}
+                        onMouseEnter={(e) => {
+                          showTooltip(e);
+                          setHoveredKey(s.key);
+                        }}
+                        onMouseMove={showTooltip}
+                        onMouseLeave={() => {
+                          setTooltip(null);
+                          setHoveredKey((cur) => (cur === s.key ? null : cur));
+                        }}
+                      />
+                    </a>
+                  );
+                })}
+              </g>
+
+              {/* Center label: total votes */}
+              <g transform={`translate(${layout.cx}, ${layout.cy})`}>
+                <text
+                  textAnchor="middle"
+                  dy="-0.15em"
+                  style={{
+                    fontSize: "2rem",
+                    fontWeight: 800,
+                    fill: rgbCss(darken(baseRgb, 0.15)),
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  {layout.totalVotes.toLocaleString("da-DK")}
+                </text>
+                <text
+                  textAnchor="middle"
+                  dy="1.2em"
+                  style={{ fontSize: "0.75rem", fill: "#6b7280", letterSpacing: "0.08em", textTransform: "uppercase" }}
+                >
+                  Stemmer i alt
+                </text>
+              </g>
+
+              {/* Leader lines + labels */}
+              <g>
+                {layout.labels.filter((s) => s.showLabel).map((s) => {
+                  const showTooltip = (e: React.MouseEvent<SVGElement>) => {
+                    const rect = containerRef.current?.getBoundingClientRect();
+                    if (!rect) return;
+                    setTooltip({
+                      x: e.clientX - rect.left,
+                      y: e.clientY - rect.top,
+                      text: s.text,
+                      weight: s.weight,
+                    });
+                  };
+                  return (
+                  <g key={`label-${s.key}`}>
+                    <polyline
+                      points={`${s.arcX},${s.arcY} ${s.bendX},${s.bendY} ${s.textX},${s.textY}`}
+                      fill="none"
+                      stroke={s.fillColor}
+                      strokeWidth={1}
+                    />
+                    <a href={s.href}>
+                      <text
+                        x={s.textX + (s.textAnchor === "start" ? 4 : -4)}
+                        y={s.textY}
+                        textAnchor={s.textAnchor}
+                        dominantBaseline="middle"
+                        style={{
+                          fontSize: "0.72rem",
+                          fontWeight: 500,
+                          fill: "#374151",
+                          cursor: "pointer",
+                        }}
+                        onMouseEnter={showTooltip}
+                        onMouseMove={showTooltip}
+                        onMouseLeave={() => setTooltip(null)}
+                      >
+                        {s.displayText}
+                      </text>
+                    </a>
+                  </g>
+                  );
+                })}
+              </g>
+            </svg>
+            )}
+            {tooltip && (
+              <div
+                role="tooltip"
+                className="pointer-events-none absolute z-10 max-w-xs rounded-md bg-gray-900 px-2.5 py-1.5 text-xs text-white shadow-lg"
+                style={{
+                  left: Math.min(tooltip.x + 12, width - 16),
+                  top: Math.max(0, tooltip.y - 8),
+                  transform: tooltip.x > width - 220 ? "translate(-100%, -100%)" : "translateY(-100%)",
+                }}
+              >
+                <div className="font-medium leading-snug">{tooltip.text}</div>
+                <div className="mt-0.5 text-[0.65rem] text-gray-300">
+                  {tooltip.weight.toLocaleString("da-DK")} stemmer
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {meta.theme_definition && (
+        <div
+          className="mt-4 -mx-6 sm:-mx-8 -mb-3 sm:-mb-4 px-6 sm:px-8 py-3 border-t rounded-b-xl"
+          style={{ backgroundColor: definitionBg, borderColor: definitionBorder }}
+        >
+          <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-gray-500">
+            Tema-afgrænsning
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-gray-600 italic">
+            {meta.theme_definition}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}

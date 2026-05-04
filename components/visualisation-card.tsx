@@ -14,10 +14,12 @@ interface VisualisationCardProps {
   description: string;
   href: string;
   subDescription?: string;
+  /** Optional Tailwind gradient classes (e.g. "from-blue-600 to-blue-800") that override the title-based mapping. Used on theme pages so the hover top-line accent matches the theme color. */
+  themeGradient?: string;
 }
 
-export function VisualisationCard({ title, description, href, subDescription }: VisualisationCardProps) {
-  const gradient = GRADIENT_MAP[title] ?? DEFAULT_GRADIENT;
+export function VisualisationCard({ title, description, href, subDescription, themeGradient }: VisualisationCardProps) {
+  const gradient = themeGradient ?? GRADIENT_MAP[title] ?? DEFAULT_GRADIENT;
 
   return (
     <Link
