@@ -15,16 +15,16 @@ interface Article {
 
 interface ArticleFilter {
   tags: string[];
+  tagIds?: number[];
   maxArticles?: number;
 }
 
 interface ThemeArticlesProps {
   filter: ArticleFilter;
-  fallbackArticles: Article[];
   initialVisible?: number;
 }
 
-const WP_API_URL = "/wp-json/wp/v2/posts?per_page=100&_embed";
+const WP_BASE = "https://www.eubureauet.dk";
 
 function decodeHTML(html: string): string {
   if (typeof document === "undefined") return html;
@@ -33,65 +33,75 @@ function decodeHTML(html: string): string {
   return el.value;
 }
 
-async function fetchWPPosts(url: string): Promise<unknown[]> {
+type WPPost = {
+  id: number;
+  title: { rendered: string };
+  excerpt: { rendered: string };
+  link: string;
+  _embedded?: {
+    "wp:featuredmedia"?: { source_url: string }[];
+  };
+};
+
+async function fetchWPPosts(url: string): Promise<WPPost[]> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`WP API ${res.status}`);
   return res.json();
 }
 
-function filterByTags(
-  posts: unknown[],
-  filter: ArticleFilter
-): Article[] {
-  const filterTags = filter.tags.map((t) => t.toLowerCase());
-  const max = filter.maxArticles ?? 6;
-
-  type WPPost = {
-    id: number;
-    title: { rendered: string };
-    excerpt: { rendered: string };
-    link: string;
-    _embedded?: {
-      "wp:featuredmedia"?: { source_url: string }[];
-      "wp:term"?: { name: string }[][];
-    };
-  };
-
-  return (posts as WPPost[])
-    .filter((post) => {
-      const postTags =
-        post._embedded?.["wp:term"]?.[1]?.map((t) => t.name) ?? [];
-      return postTags.some((tag) =>
-        filterTags.includes(tag.toLowerCase())
-      );
-    })
-    .slice(0, max)
-    .map((post) => ({
-      id: String(post.id),
-      title: decodeHTML(post.title.rendered),
-      description: decodeHTML(
-        // eslint-disable-next-line sonarjs/slow-regex -- linear-time negated character class, safe
-        post.excerpt.rendered.replace(/<[^>]+>/g, "").trim()
-      ),
-      image:
-        post._embedded?.["wp:featuredmedia"]?.[0]?.source_url ?? "",
-      url: post.link,
-    }));
+function mapPosts(posts: WPPost[]): Article[] {
+  return posts.map((post) => ({
+    id: String(post.id),
+    title: decodeHTML(post.title.rendered),
+    description: decodeHTML(
+      // eslint-disable-next-line sonarjs/slow-regex -- linear-time negated character class, safe
+      post.excerpt.rendered.replace(/<[^>]+>/g, "").trim()
+    ),
+    image: post._embedded?.["wp:featuredmedia"]?.[0]?.source_url ?? "",
+    url: post.link,
+  }));
 }
 
-export function ThemeArticles({
-  filter,
-  fallbackArticles,
-  initialVisible = 3,
-}: ThemeArticlesProps) {
+export function ThemeArticles({ filter, initialVisible = 3 }: ThemeArticlesProps) {
   const [expanded, setExpanded] = useState(false);
 
-  const { data: posts } = useSWR(WP_API_URL, fetchWPPosts, {
+  const tagIds = filter.tagIds ?? [];
+  const max = filter.maxArticles ?? 6;
+  // Only build a request URL once we actually have tag IDs to filter by;
+  // SWR treats a `null` key as a no-op, which safely short-circuits when
+  // the theme JSON is missing tagIds (e.g. before the prebuild sync runs).
+  const url =
+    tagIds.length > 0
+      ? `${WP_BASE}/wp-json/wp/v2/posts?tags=${tagIds.join(",")}&per_page=${max}&_embed`
+      : null;
+
+  const { data: posts, error, isLoading } = useSWR(url, fetchWPPosts, {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
   });
 
-  const articles = posts ? filterByTags(posts, filter) : fallbackArticles;
+  if (isLoading) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center py-12 text-gray-500"
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+        <p className="mt-3 text-sm">Henter artikler…</p>
+      </div>
+    );
+  }
+
+  if (error || !posts) {
+    return (
+      <p className="text-sm text-gray-500 italic">
+        Kunne ikke hente artikler lige nu.
+      </p>
+    );
+  }
+
+  const articles = mapPosts(posts);
 
   if (articles.length === 0) {
     return (

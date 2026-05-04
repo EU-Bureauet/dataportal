@@ -4,13 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "prebuild": "node scripts/fetch-articles.mjs",
+    "prebuild": "node scripts/sync-theme-tag-ids.mjs",
     "build": "next build",
     "start": "npx serve out -l 3000",
     "lint": "eslint . && tsc --noemit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "fetch-articles": "node scripts/fetch-articles.mjs",
+    "sync-theme-tag-ids": "node scripts/sync-theme-tag-ids.mjs",
     "package": "next build && cd out && tar -cf ../build-$(date +%Y-%m-%d-%s).tar.gz *"
   },
   "dependencies": {

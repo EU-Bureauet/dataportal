@@ -7,19 +7,9 @@ import { ThemeArticles } from "@/components/theme-articles";
 import { VisualisationCard } from "@/components/visualisation-card";
 import { ThemeDonutChart, type ThemeVotesData } from "@/components/theme-donut-chart";
 
-interface ThemeArticle {
-  id: string;
-  title: string;
-  description: string;
-  image: string;
-  url: string;
-  date: string;
-  categories: string[];
-  tags: string[];
-}
-
 interface ThemeArticleFilter {
   tags: string[];
+  tagIds?: number[];
   maxArticles?: number;
 }
 
@@ -63,21 +53,6 @@ function getThemeData(slug: string): ThemeData | null {
   if (!fs.existsSync(filePath)) return null;
   const raw = fs.readFileSync(filePath, "utf-8");
   return JSON.parse(raw) as ThemeData;
-}
-
-function getThemeArticles(filter: ThemeArticleFilter): ThemeArticle[] {
-  const articlesPath = path.join(process.cwd(), "data", "articles.json");
-  if (!fs.existsSync(articlesPath)) return [];
-  const raw = fs.readFileSync(articlesPath, "utf-8");
-  const data = JSON.parse(raw) as { articles: ThemeArticle[] };
-
-  const filterTags = filter.tags.map((t) => t.toLowerCase());
-
-  return data.articles
-    .filter((a) =>
-      a.tags.some((tag) => filterTags.includes(tag.toLowerCase()))
-    )
-    .slice(0, filter.maxArticles ?? 6);
 }
 
 interface LatestVotesDoc {
@@ -200,8 +175,6 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
     notFound();
   }
 
-  const articles = getThemeArticles(theme.articleFilter);
-
   // Map theme slug -> Tailwind gradient classes, matching the colors used on the
   // ThemeExplorationCards on the dataportal landing page.
   const themeGradients: Record<string, string> = {
@@ -248,7 +221,6 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
             <h2 className="text-xl font-bold text-gray-900 mb-6"></h2>
             <ThemeArticles
               filter={theme.articleFilter}
-              fallbackArticles={articles}
             />
           </aside>
 
