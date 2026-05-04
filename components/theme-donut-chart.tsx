@@ -31,6 +31,11 @@ interface ThemeDonutChartProps {
   data: ThemeVotesData;
   /** Hex color used as the base for the donut. Variations are derived from it. */
   accentColor?: string;
+  /** When the surrounding theme page is wired to a theme dataset on /latest-votes,
+   * pass the search + eurovoc combo so each slice can deep-link to that dataset
+   * and auto-scroll/expand the specific document. */
+  latestVotesSearch?: string;
+  latestVotesEurovoc?: string;
 }
 
 interface Slice {
@@ -38,6 +43,7 @@ interface Slice {
   text: string;
   href: string;
   weight: number;
+  documentReference: string;
 }
 
 interface LabelLayout extends Slice {
@@ -66,7 +72,15 @@ interface LabelLayout extends Slice {
   displayText: string;
 }
 
-function buildSlices(docs: ThemeVoteDocument[]): Slice[] {
+function buildSliceHref(label: string, documentReference: string, search?: string, eurovoc?: string): string {
+  const basePath = process.env.NEXT_PUBLIC_BASEPATH ? `/${process.env.NEXT_PUBLIC_BASEPATH}` : "";
+  if (search && eurovoc && documentReference) {
+    return `${basePath}/latest-votes?search=${encodeURIComponent(search)}&eurovoc=${encodeURIComponent(eurovoc)}&doc=${encodeURIComponent(documentReference)}`;
+  }
+  return `${basePath}/latest-votes?search=${encodeURIComponent(label)}`;
+}
+
+function buildSlices(docs: ThemeVoteDocument[], search?: string, eurovoc?: string): Slice[] {
   const map = new Map<string, Slice>();
   for (const doc of docs) {
     const label = (doc.short_title || "").trim();
@@ -83,11 +97,13 @@ function buildSlices(docs: ThemeVoteDocument[]): Slice[] {
     if (existing) {
       existing.weight += weight;
     } else {
+      const documentReference = doc.document_reference || "";
       map.set(label, {
-        key: doc.document_reference || label,
+        key: documentReference || label,
         text: label,
         weight,
-        href: `/latest-votes?search=${encodeURIComponent(label)}`,
+        documentReference,
+        href: buildSliceHref(label, documentReference, search, eurovoc),
       });
     }
   }
@@ -274,7 +290,7 @@ function computeDonutLayout(
   return { labels, totalVotes, height, cx, cy, outerRadius, innerRadius };
 }
 
-export function ThemeDonutChart({ data, accentColor = "#1d4ed8" }: ThemeDonutChartProps) {
+export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSearch, latestVotesEurovoc }: ThemeDonutChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(640);
   // Avoid SSR/CSR hydration mismatches: the SVG is layout-dependent on the
@@ -306,7 +322,10 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8" }: ThemeDonutCha
   );
 
   const meta = data.metadata ?? {};
-  const slices = useMemo(() => buildSlices(data.documents ?? []), [data.documents]);
+  const slices = useMemo(
+    () => buildSlices(data.documents ?? [], latestVotesSearch, latestVotesEurovoc),
+    [data.documents, latestVotesSearch, latestVotesEurovoc],
+  );
   const baseRgb = useMemo(() => hexToRgb(accentColor), [accentColor]);
 
   // Track container width so the chart is responsive.

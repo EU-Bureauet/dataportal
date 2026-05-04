@@ -28,6 +28,45 @@ const normalizeSittingDate = (value: string): string => {
   return value.split(/[T ]/)[0];
 };
 
+/** Handles deep-linking to a specific document via ?doc=<reference> on
+ * /latest-votes. Once data has loaded, finds the matching group, jumps to
+ * the right page, expands it, and scrolls into view. */
+export function useDocDeepLink(params: {
+  docParam: string | null;
+  hasData: boolean;
+  filteredGroups: VoteGroup[];
+  itemsPerPage: number;
+  currentPage: number;
+  setCurrentPage: (page: number) => void;
+  setExpandedGroups: React.Dispatch<React.SetStateAction<Set<string>>>;
+}) {
+  const { docParam, hasData, filteredGroups, itemsPerPage, currentPage, setCurrentPage, setExpandedGroups } = params;
+  const [scrolledTo, setScrolledTo] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (!docParam || !hasData || scrolledTo === docParam) return;
+    const idx = filteredGroups.findIndex((g) => g.document_reference === docParam);
+    if (idx === -1) return;
+    const targetPage = Math.floor(idx / itemsPerPage) + 1;
+    if (targetPage !== currentPage) {
+      setCurrentPage(targetPage);
+      return;
+    }
+    const group = filteredGroups[idx];
+    const groupKey = `${group.document_reference}-${normalizeSittingDate(group.document_sitting_date)}`;
+    setExpandedGroups((prev) => {
+      if (prev.has(groupKey)) return prev;
+      const next = new Set(prev);
+      next.add(groupKey);
+      return next;
+    });
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`doc-${docParam}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    setScrolledTo(docParam);
+  }, [docParam, hasData, filteredGroups, itemsPerPage, currentPage, scrolledTo, setCurrentPage, setExpandedGroups]);
+}
+
 /* ── Vote Group Card ─────────────────────────────────────── */
 
 export function VoteGroupCard({ group, expandedGroups, setExpandedGroups }: {
@@ -44,7 +83,7 @@ export function VoteGroupCard({ group, expandedGroups, setExpandedGroups }: {
     : undefined;
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div id={`doc-${group.document_reference}`} className="bg-white rounded-lg shadow-md p-6 scroll-mt-24">
       <div className="mb-6">
         <div className="mt-3 space-y-2">
           {group.committee.length > 0 && (

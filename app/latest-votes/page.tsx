@@ -3,7 +3,7 @@
 import React, { Suspense, useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
-import { VoteGroupCard, FilterPanel, type VoteGroup } from "./components";
+import { VoteGroupCard, FilterPanel, useDocDeepLink, type VoteGroup } from "./components";
 
 interface Vote {
   vote_id: string;
@@ -139,6 +139,14 @@ export default function LatestVotesPage() {
   );
 }
 
+interface Disagreement {
+  "Vote ID": string;
+  "MEP Name": string;
+}
+interface BrudData {
+  mep_vs_party: { disagreements: Disagreement[] };
+}
+
 function LatestVotesContent() {
   const basePath = process.env.NEXT_PUBLIC_BASEPATH || "dataportal";
   const searchParams = useSearchParams();
@@ -181,13 +189,6 @@ function LatestVotesContent() {
   const data = themeDataset && rawData ? normalizeThemeData(rawData) : rawData;
 
   // Fetch disagreements data for MEP filtering
-  interface Disagreement {
-    "Vote ID": string;
-    "MEP Name": string;
-  }
-  interface BrudData {
-    mep_vs_party: { disagreements: Disagreement[] };
-  }
   const { data: brudData } = useSWR<BrudData>(
     selectedMep ? `/${basePath}/data/Danske_MEPs_brud_med_partigruppelinjen.json` : null,
     fetcher
@@ -401,20 +402,23 @@ function LatestVotesContent() {
     return filteredGroups.slice(startIndex, endIndex);
   }, [filteredGroups, currentPage]);
 
-  // Reset to page 1 when filter changes
+  // Reset page and display limits when filter changes
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCommittee, selectedEurovoc, searchQuery, selectedMep]);
-
-  // Reset eurovoc display limit when committee or eurovoc filter changes
-  React.useEffect(() => {
     setEurovocDisplayLimit(10);
-  }, [selectedCommittee, selectedEurovoc, searchQuery, selectedMep]);
-
-  // Reset committee display limit when eurovoc or committee filter changes
-  React.useEffect(() => {
     setCommitteeDisplayLimit(10);
   }, [selectedCommittee, selectedEurovoc, searchQuery, selectedMep]);
+
+  // Deep-link to a specific document via ?doc=<reference>.
+  useDocDeepLink({
+    docParam: searchParams.get("doc"),
+    hasData: Boolean(data),
+    filteredGroups,
+    itemsPerPage: ITEMS_PER_PAGE,
+    currentPage,
+    setCurrentPage,
+    setExpandedGroups,
+  });
 
   if (isLoading) {
     return (

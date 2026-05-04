@@ -241,14 +241,21 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
             </div>
 
             {/* Donut chart over the votes that make up this theme. */}
-            {themeVotesData && (
-              <div className="mt-4 bg-white rounded-xl shadow-md border border-gray-100 px-6 sm:px-8 py-3 sm:py-4">
-                <ThemeDonutChart
-                  data={themeVotesData}
-                  accentColor={themeAccentColor}
-                />
-              </div>
-            )}
+            {themeVotesData && (() => {
+              const latestVotesVis = theme.visualisations.find(
+                (v) => v.dataSource?.file === "latest_votes.json"
+              );
+              return (
+                <div className="mt-4 bg-white rounded-xl shadow-md border border-gray-100 px-6 sm:px-8 py-3 sm:py-4">
+                  <ThemeDonutChart
+                    data={themeVotesData}
+                    accentColor={themeAccentColor}
+                    latestVotesSearch={latestVotesVis?.dataSource?.search}
+                    latestVotesEurovoc={latestVotesVis?.dataSource?.eurovoc}
+                  />
+                </div>
+              );
+            })()}
           </section>
         </div>
       </div>
