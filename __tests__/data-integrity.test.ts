@@ -371,8 +371,14 @@ describe('MEPs data → MEPs overview', () => {
       expect(mep).toHaveProperty('country_code')
       expect(mep).toHaveProperty('national_party_id')
       expect(mep).toHaveProperty('current_group_id')
-      expect(mep.national_party_id).toHaveProperty('name')
-      expect(mep.current_group_id).toHaveProperty('name')
+      // national_party_id and current_group_id can be null for former MEPs;
+      // when present they must carry a `name`.
+      if (mep.national_party_id) {
+        expect(mep.national_party_id).toHaveProperty('name')
+      }
+      if (mep.current_group_id) {
+        expect(mep.current_group_id).toHaveProperty('name')
+      }
     }
   })
 
@@ -747,3 +753,277 @@ describe('Cross-dataset consistency', () => {
     expect(winsKeys.has('TOTAL')).toBe(true)
   })
 })
+
+// ── Theme datasets → Theme pages, latest-votes (theme mode), heatmap, coalitions ──
+
+/** All themes shipped with the app. Each entry pairs the theme JSON file
+ * (loaded by /tema/[slug] and the donut chart) with the matching key used
+ * by the All_Pairwise_coalitions.json / All_Group_wins.json /
+ * All_Winning_coalitions.json groupings. */
+const THEME_FIXTURES = [
+  { file: 'theme_votes_forsvar_sikkerhed.json', themeKey: 'theme_forsvar_sikkerhed' },
+  { file: 'theme_votes_energi_industri.json', themeKey: 'theme_energi_industri' },
+  { file: 'theme_votes_miljo_sundhed.json', themeKey: 'theme_miljo_sundhed' },
+] as const
+
+interface ThemeVote {
+  vote_id: number | string
+  vote_description: string
+  sitting_time?: string
+  for: number
+  against: number
+  abstention: number
+}
+
+interface ThemeDocument {
+  document_reference: string
+  document_sitting_date: string
+  short_title: string
+  committee: (string | number)[]
+  eurovoc_keywords: string[]
+  voteCount: number
+  votes: ThemeVote[]
+}
+
+interface ThemeVotesFile {
+  metadata: {
+    votes_total: number
+    documents_total: number
+    theme: string
+    theme_label: string
+    theme_definition?: string
+    theme_description?: string
+  }
+  committees: Array<{ label: string; voteCount: number }>
+  eurovoc: Array<{ label: string; voteCount: number }>
+  documents: ThemeDocument[]
+}
+
+describe('Theme votes → Theme pages, latest-votes (theme mode) & donut chart', () => {
+  for (const { file } of THEME_FIXTURES) {
+    describe(file, () => {
+      let theme: ThemeVotesFile
+
+      beforeAll(() => {
+        theme = loadJson<ThemeVotesFile>(file)
+      })
+
+      it('has metadata with required theme fields', () => {
+        expect(theme).toHaveProperty('metadata')
+        expect(theme.metadata).toHaveProperty('theme')
+        expect(theme.metadata).toHaveProperty('theme_label')
+        expect(typeof theme.metadata.votes_total).toBe('number')
+        expect(typeof theme.metadata.documents_total).toBe('number')
+      })
+
+      it('has committees and eurovoc count arrays for filter tiles', () => {
+        expect(Array.isArray(theme.committees)).toBe(true)
+        expect(Array.isArray(theme.eurovoc)).toBe(true)
+        for (const c of theme.committees) {
+          expect(typeof c.label).toBe('string')
+          expect(typeof c.voteCount).toBe('number')
+          expect(c.voteCount).toBeGreaterThan(0)
+        }
+        for (const e of theme.eurovoc) {
+          expect(typeof e.label).toBe('string')
+          expect(typeof e.voteCount).toBe('number')
+          expect(e.voteCount).toBeGreaterThan(0)
+        }
+      })
+
+      it('documents array is non-empty and each doc has the required shape', () => {
+        expect(Array.isArray(theme.documents)).toBe(true)
+        expect(theme.documents.length).toBeGreaterThan(0)
+        for (const doc of theme.documents) {
+          expect(typeof doc.document_reference).toBe('string')
+          expect(typeof doc.document_sitting_date).toBe('string')
+          expect(typeof doc.short_title).toBe('string')
+          expect(Array.isArray(doc.committee)).toBe(true)
+          expect(Array.isArray(doc.eurovoc_keywords)).toBe(true)
+          expect(Array.isArray(doc.votes)).toBe(true)
+          expect(doc.votes.length).toBeGreaterThan(0)
+        }
+      })
+
+      it('every vote carries vote_id and numeric for/against/abstention', () => {
+        for (const doc of theme.documents) {
+          for (const v of doc.votes) {
+            // vote_id is required so the latest-votes page can deep-link
+            // and so MEP-disagreement filtering can match.
+            expect(v.vote_id).toBeDefined()
+            expect(['number', 'string']).toContain(typeof v.vote_id)
+            expect(typeof v.for).toBe('number')
+            expect(typeof v.against).toBe('number')
+            expect(typeof v.abstention).toBe('number')
+            expect(v.for + v.against + v.abstention).toBeGreaterThan(0)
+          }
+        }
+      })
+
+      it('document voteCount equals votes.length', () => {
+        for (const doc of theme.documents) {
+          if (typeof doc.voteCount === 'number') {
+            expect(doc.voteCount).toBe(doc.votes.length)
+          }
+        }
+      })
+
+      it('metadata totals match the documents/votes content', () => {
+        const docCount = theme.documents.length
+        const voteCount = theme.documents.reduce((n, d) => n + d.votes.length, 0)
+        expect(theme.metadata.documents_total).toBe(docCount)
+        expect(theme.metadata.votes_total).toBe(voteCount)
+      })
+
+      it('(document_reference, sitting_date) tuples are unique (matches latest-votes dedup key)', () => {
+        const keys = theme.documents
+          .map((d) => `${d.document_reference}|${(d.document_sitting_date || '').split(/[T ]/)[0]}`)
+          .filter((k) => !k.startsWith('|'))
+        expect(new Set(keys).size).toBe(keys.length)
+      })
+
+      it('precomputed committee tile counts match recomputed totals', () => {
+        const computed: Record<string, number> = {}
+        for (const doc of theme.documents) {
+          for (const raw of doc.committee) {
+            const name = String(raw).trim()
+            if (!name) continue
+            computed[name] = (computed[name] || 0) + doc.votes.length
+          }
+        }
+        for (const c of theme.committees) {
+          expect(computed[c.label]).toBe(c.voteCount)
+        }
+      })
+
+      it('precomputed eurovoc tile counts match recomputed totals', () => {
+        const computed: Record<string, number> = {}
+        for (const doc of theme.documents) {
+          for (const kw of doc.eurovoc_keywords || []) {
+            computed[kw] = (computed[kw] || 0) + doc.votes.length
+          }
+        }
+        for (const e of theme.eurovoc) {
+          expect(computed[e.label]).toBe(e.voteCount)
+        }
+      })
+    })
+  }
+})
+
+describe('Theme groupings in coalition datasets → Heatmap & coalition charts', () => {
+  let pairwise: PairwiseCoalitionsData
+  let groupWins: GroupWinsData
+  let coalitions: CoalitionsData
+
+  beforeAll(() => {
+    pairwise = loadJson<PairwiseCoalitionsData>('All_Pairwise_coalitions.json')
+    groupWins = loadJson<GroupWinsData>('All_Group_wins.json')
+    coalitions = loadJson<CoalitionsData>('All_Winning_coalitions.json')
+  })
+
+  for (const { themeKey } of THEME_FIXTURES) {
+    describe(themeKey, () => {
+      it('exists in All_Pairwise_coalitions.json with valid records', () => {
+        const records = (pairwise as Record<string, unknown>)[themeKey] as Array<{
+          'Group Pair': [string, string]
+          Total: number
+          Count: number
+          Percentage: number
+        }>
+        expect(Array.isArray(records)).toBe(true)
+        expect(records.length).toBeGreaterThan(0)
+        for (const r of records) {
+          expect(Array.isArray(r['Group Pair'])).toBe(true)
+          expect(r['Group Pair']).toHaveLength(2)
+          expect(typeof r.Total).toBe('number')
+          expect(typeof r.Count).toBe('number')
+          expect(typeof r.Percentage).toBe('number')
+          expect(r.Count).toBeLessThanOrEqual(r.Total)
+          expect(r.Percentage).toBeGreaterThanOrEqual(0)
+          expect(r.Percentage).toBeLessThanOrEqual(100)
+        }
+      })
+
+      it('exists in All_Group_wins.json with valid Group Win records', () => {
+        const records = (groupWins as Record<string, unknown>)[themeKey] as Array<{
+          'Group ID': string
+          'Win Count': number
+          'Win Percentage': number
+        }>
+        expect(Array.isArray(records)).toBe(true)
+        expect(records.length).toBeGreaterThan(0)
+        for (const r of records) {
+          expect(typeof r['Group ID']).toBe('string')
+          expect(typeof r['Win Count']).toBe('number')
+          expect(typeof r['Win Percentage']).toBe('number')
+          expect(r['Win Percentage']).toBeGreaterThanOrEqual(0)
+          expect(r['Win Percentage']).toBeLessThanOrEqual(100)
+          expect(GROUP_COLORS).toHaveProperty(r['Group ID'])
+        }
+      })
+
+      it('exists in All_Winning_coalitions.json with valid coalition records', () => {
+        const records = (coalitions as Record<string, unknown>)[themeKey] as Array<{
+          'Winning Coalition': string[]
+          Count: number
+          Percentage: number
+        }>
+        expect(Array.isArray(records)).toBe(true)
+        expect(records.length).toBeGreaterThan(0)
+        for (const r of records) {
+          expect(Array.isArray(r['Winning Coalition'])).toBe(true)
+          expect(r['Winning Coalition'].length).toBeGreaterThan(0)
+          expect(typeof r.Count).toBe('number')
+          expect(typeof r.Percentage).toBe('number')
+          expect(r.Percentage).toBeGreaterThanOrEqual(0)
+          expect(r.Percentage).toBeLessThanOrEqual(100)
+        }
+      })
+    })
+  }
+
+  it('every theme key in pairwise data is also present in group wins and winning coalitions', () => {
+    const pairwiseThemes = Object.keys(pairwise).filter((k) => k.startsWith('theme_'))
+    expect(pairwiseThemes.length).toBeGreaterThan(0)
+    for (const k of pairwiseThemes) {
+      expect(groupWins).toHaveProperty(k)
+      expect(coalitions).toHaveProperty(k)
+    }
+  })
+
+  it('heatmap matrix can be built from each theme pairwise grouping', () => {
+    for (const { themeKey } of THEME_FIXTURES) {
+      const records = (pairwise as Record<string, unknown>)[themeKey] as Parameters<
+        typeof buildMatrixFromPairwise
+      >[0]
+      const matrix = buildMatrixFromPairwise(records)
+      expect(Array.isArray(matrix)).toBe(true)
+      expect(matrix.length).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('Theme votes ↔ MEP disagreements cross-link', () => {
+  it('each theme votes file shares some vote_ids with the MEP disagreement dataset', () => {
+    const brud = loadJson<{ mep_vs_party: { disagreements: Array<{ 'Vote ID': string | number }> } }>(
+      'Danske_MEPs_brud_med_partigruppelinjen.json'
+    )
+    const allDisagreementVoteIds = new Set(
+      brud.mep_vs_party.disagreements.map((d) => String(d['Vote ID']))
+    )
+
+    for (const { file } of THEME_FIXTURES) {
+      const theme = loadJson<ThemeVotesFile>(file)
+      const themeVoteIds = new Set<string>()
+      for (const doc of theme.documents) {
+        for (const v of doc.votes) themeVoteIds.add(String(v.vote_id))
+      }
+      const overlap = [...themeVoteIds].filter((id) => allDisagreementVoteIds.has(id))
+      // Without overlap, the ?mep=<name>&search=<theme>&eurovoc=<…> deep-link
+      // from /danish-mep-votes would render an empty list on /latest-votes.
+      expect(overlap.length).toBeGreaterThan(0)
+    }
+  })
+})
+
