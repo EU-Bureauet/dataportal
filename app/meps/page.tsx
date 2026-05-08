@@ -4,6 +4,7 @@ import React from 'react';
 import { MEPsOverview } from "@/components/meps-overview";
 import { MEPResponse } from "@/types/data";
 import { Card } from "@/components/ui/card";
+import { ParliamentHemicycle } from "@/components/parliament-hemicycle";
 import useSWR from "swr";
 
 export default function MEPsPage() {
@@ -67,6 +68,11 @@ export default function MEPsPage() {
             Europa-Parlamentet består af <span className="font-semibold text-gray-900">720 folkevalgte medlemmer</span> fra hele EU.
             Her kan du udforske alle medlemmerne, filtrere dem efter land, parti eller politisk gruppe og få indblik i deres stemmeaktivitet og deltagelsesgrad.
           </p>
+        </Card>
+
+        {/* Parliament Hemicycle */}
+        <Card className="p-6 mb-8">
+          <ParliamentHemicycle />
         </Card>
 
         <MEPsOverview data={activeMEPs} />

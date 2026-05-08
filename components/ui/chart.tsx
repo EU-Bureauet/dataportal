@@ -1,3 +1,4 @@
+/* eslint-disable complexity -- shadcn/ui third-party component, not project code */
 "use client"
 
 import * as React from "react"

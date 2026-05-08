@@ -3,9 +3,9 @@
 import React, { useState, useMemo, Suspense } from 'react';
 import { Card } from "@/components/ui/card";
 import { compareMEPs } from "@/lib/vote-comparison";
-import { MEPResponse, MEPData, voteValueToLabel, voteValueToBgColor } from "@/types/data";
-import { useRouter } from 'next/navigation';
+import { MEPResponse, MEPData } from "@/types/data";
 import useSWR from "swr";
+import { MEPSelector, VoteList } from "./components";
 
 interface MEPComparison {
   mep1_info: { political_group: string; national_group: string; country: string };
@@ -19,8 +19,37 @@ interface MEPComparison {
   disagreements: Array<{ vote_id: string; entity1_vote: number | null; entity2_vote: number | null }>;
 }
 
+const COUNTRY_NAMES: { [key: string]: string } = {
+  "AUT": "Østrig",
+  "BEL": "Belgien",
+  "BGR": "Bulgarien",
+  "HRV": "Kroatien",
+  "CYP": "Cypern",
+  "CZE": "Tjekkiet",
+  "DNK": "Danmark",
+  "EST": "Estland",
+  "FIN": "Finland",
+  "FRA": "Frankrig",
+  "DEU": "Tyskland",
+  "GRC": "Grækenland",
+  "HUN": "Ungarn",
+  "IRL": "Irland",
+  "ITA": "Italien",
+  "LVA": "Letland",
+  "LTU": "Litauen",
+  "LUX": "Luxembourg",
+  "MLT": "Malta",
+  "NLD": "Holland",
+  "POL": "Polen",
+  "PRT": "Portugal",
+  "ROU": "Rumænien",
+  "SVK": "Slovakiet",
+  "SVN": "Slovenien",
+  "ESP": "Spanien",
+  "SWE": "Sverige"
+};
+
 function CompareMEPsPage() {
-  const router = useRouter();
   const [mep1Id, setMep1Id] = useState<string>("");
   const [mep2Id, setMep2Id] = useState<string>("");
   const [comparison, setComparison] = useState<MEPComparison | null>(null);
@@ -41,38 +70,6 @@ function CompareMEPsPage() {
     fetcher
   );
 
-  // Map country codes to full names
-  const COUNTRY_NAMES: { [key: string]: string } = {
-    'AUT': 'Østrig',
-    'BEL': 'Belgien',
-    'BGR': 'Bulgarien',
-    'HRV': 'Kroatien',
-    'CYP': 'Cypern',
-    'CZE': 'Tjekkiet',
-    'DNK': 'Danmark',
-    'EST': 'Estland',
-    'FIN': 'Finland',
-    'FRA': 'Frankrig',
-    'DEU': 'Tyskland',
-    'GRC': 'Grækenland',
-    'HUN': 'Ungarn',
-    'IRL': 'Irland',
-    'ITA': 'Italien',
-    'LVA': 'Letland',
-    'LTU': 'Litauen',
-    'LUX': 'Luxembourg',
-    'MLT': 'Malta',
-    'NLD': 'Nederlandene',
-    'POL': 'Polen',
-    'PRT': 'Portugal',
-    'ROU': 'Rumænien',
-    'SVK': 'Slovakiet',
-    'SVN': 'Slovenien',
-    'ESP': 'Spanien',
-    'SWE': 'Sverige',
-    'GBR': 'Storbritannien'
-  };
-
   // Helper function to extract country code from URL
   const getCountryCode = (countryCodeOrUrl: string): string => {
     if (!countryCodeOrUrl) return 'Unknown';
@@ -82,12 +79,6 @@ function CompareMEPsPage() {
       return parts[parts.length - 1] || 'Unknown';
     }
     return countryCodeOrUrl;
-  };
-
-  // Helper function to get full country name
-  const getCountryName = (countryCodeOrUrl: string): string => {
-    const code = getCountryCode(countryCodeOrUrl);
-    return COUNTRY_NAMES[code] || code;
   };
 
   // Group MEPs by country and party, then sort alphabetically
@@ -113,11 +104,13 @@ function CompareMEPsPage() {
     });
 
     // Sort MEPs within each party alphabetically by name
+    /* eslint-disable sonarjs/no-nested-functions -- standard nested iterators */
     grouped.forEach(countryGroup => {
       countryGroup.forEach(partyMeps => {
         partyMeps.sort((a, b) => a.full_name.localeCompare(b.full_name));
       });
     });
+    /* eslint-enable sonarjs/no-nested-functions */
 
     return grouped;
   }, [mepsData]);
@@ -217,121 +210,26 @@ function CompareMEPsPage() {
         {/* MEP Selection */}
         <Card className="p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* First MEP */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Vælg første MEP:</label>
-              <input
-                type="text"
-                placeholder="Søg efter navn, parti eller land..."
-                value={searchTerm1}
-                onChange={(e) => setSearchTerm1(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <select
-                value={mep1Id}
-                onChange={(e) => setMep1Id(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                size={10}
-              >
-                <option value="">Vælg MEP...</option>
-                {searchTerm1 ? (
-                  // When searching, show flat list
-                  filteredMeps1.map(mep => (
-                    <option key={mep.mep_id} value={mep.mep_id}>
-                      {mep.full_name} ({mep.national_party_id.name}) - {getCountryName(mep.country_code)}
-                    </option>
-                  ))
-                ) : (
-                  // When not searching, show grouped by country and party
-                  Array.from(groupedMeps.entries())
-                    .sort(([countryA], [countryB]) => {
-                      // Denmark (DNK) always comes first
-                      if (countryA === 'DNK') return -1;
-                      if (countryB === 'DNK') return 1;
-                      // Then alphabetically by country name
-                      const nameA = COUNTRY_NAMES[countryA] || countryA;
-                      const nameB = COUNTRY_NAMES[countryB] || countryB;
-                      return nameA.localeCompare(nameB);
-                    })
-                    .flatMap(([country, partyGroups]) =>
-                      Array.from(partyGroups.entries())
-                        .sort(([partyA], [partyB]) => (partyA || '').localeCompare(partyB || ''))
-                        .map(([party, meps]) => (
-                          <optgroup key={`${country}-${party}`} label={`${COUNTRY_NAMES[country] || country} - ${party}`}>
-                            {meps.map((mep: MEPData) => (
-                              <option key={mep.mep_id} value={mep.mep_id}>
-                                {mep.full_name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ))
-                    )
-                )}
-              </select>
-              {searchTerm1 && (
-                <div className="text-xs text-gray-500 mt-1">
-                  Viser {filteredMeps1.length} af {mepsData.meps.length} MEP&apos;er
-                </div>
-              )}
-            </div>
-
-            {/* Second MEP */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Vælg anden MEP:</label>
-              <input
-                type="text"
-                placeholder="Søg efter navn, parti eller land..."
-                value={searchTerm2}
-                onChange={(e) => setSearchTerm2(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <select
-                value={mep2Id}
-                onChange={(e) => setMep2Id(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                size={10}
-              >
-                <option value="">Vælg MEP...</option>
-                {searchTerm2 ? (
-                  // When searching, show flat list
-                  filteredMeps2.map(mep => (
-                    <option key={mep.mep_id} value={mep.mep_id}>
-                      {mep.full_name} ({mep.national_party_id.name}) - {getCountryName(mep.country_code)}
-                    </option>
-                  ))
-                ) : (
-                  // When not searching, show grouped by country and party
-                  Array.from(groupedMeps.entries())
-                    .sort(([countryA], [countryB]) => {
-                      // Denmark (DNK) always comes first
-                      if (countryA === 'DNK') return -1;
-                      if (countryB === 'DNK') return 1;
-                      // Then alphabetically by country name
-                      const nameA = COUNTRY_NAMES[countryA] || countryA;
-                      const nameB = COUNTRY_NAMES[countryB] || countryB;
-                      return nameA.localeCompare(nameB);
-                    })
-                    .flatMap(([country, partyGroups]) =>
-                      Array.from(partyGroups.entries())
-                        .sort(([partyA], [partyB]) => (partyA || '').localeCompare(partyB || ''))
-                        .map(([party, meps]) => (
-                          <optgroup key={`${country}-${party}`} label={`${COUNTRY_NAMES[country] || country} - ${party}`}>
-                            {meps.map((mep: MEPData) => (
-                              <option key={mep.mep_id} value={mep.mep_id}>
-                                {mep.full_name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ))
-                    )
-                )}
-              </select>
-              {searchTerm2 && (
-                <div className="text-xs text-gray-500 mt-1">
-                  Viser {filteredMeps2.length} af {mepsData.meps.length} MEP&apos;er
-                </div>
-              )}
-            </div>
+            <MEPSelector
+              label="Vælg første MEP:"
+              selectedId={mep1Id}
+              onSelectId={setMep1Id}
+              searchTerm={searchTerm1}
+              onSearchTermChange={setSearchTerm1}
+              filteredMeps={filteredMeps1}
+              groupedMeps={groupedMeps}
+              totalMepsCount={mepsData.meps.length}
+            />
+            <MEPSelector
+              label="Vælg anden MEP:"
+              selectedId={mep2Id}
+              onSelectId={setMep2Id}
+              searchTerm={searchTerm2}
+              onSearchTermChange={setSearchTerm2}
+              filteredMeps={filteredMeps2}
+              groupedMeps={groupedMeps}
+              totalMepsCount={mepsData.meps.length}
+            />
           </div>
 
           <button
@@ -423,78 +321,22 @@ function CompareMEPsPage() {
               </div>
             </Card>
 
-            {/* Agreements List */}
-            {showAgreements && comparison.agreements.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-xl font-bold mb-4">
-                  Enigheder ({comparison.agreements.length})
-                </h3>
-                <div className="space-y-2">
-                  {comparison.agreements.slice(0, 50).map((vote, index: number) => (
-                    <Card
-                      key={index}
-                      className="p-4 hover:shadow-lg transition-shadow cursor-pointer"
-                      onClick={() => router.push(`/vote?id=${vote.vote_id}`)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <span className="text-sm text-gray-600">Afstemning ID: {vote.vote_id}</span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className={`px-3 py-1 rounded text-sm font-semibold ${voteValueToBgColor(vote.entity1_vote)}`}>
-                            {getMEPName(comparedMep1Id)}: {voteValueToLabel(vote.entity1_vote)}
-                          </div>
-                          <div className={`px-3 py-1 rounded text-sm font-semibold ${voteValueToBgColor(vote.entity2_vote)}`}>
-                            {getMEPName(comparedMep2Id)}: {voteValueToLabel(vote.entity2_vote)}
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                  {comparison.agreements.length > 50 && (
-                    <div className="text-center text-gray-600 py-4">
-                      Viser 50 af {comparison.agreements.length} enigheder
-                    </div>
-                  )}
-                </div>
-              </div>
+            {showAgreements && (
+              <VoteList
+                title="Enigheder"
+                votes={comparison.agreements}
+                mep1Name={getMEPName(comparedMep1Id)}
+                mep2Name={getMEPName(comparedMep2Id)}
+              />
             )}
 
-            {/* Disagreements List */}
-            {showDisagreements && comparison.disagreements.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-xl font-bold mb-4">
-                  Uenigheder ({comparison.disagreements.length})
-                </h3>
-                <div className="space-y-2">
-                  {comparison.disagreements.slice(0, 50).map((vote, index: number) => (
-                    <Card
-                      key={index}
-                      className="p-4 hover:shadow-lg transition-shadow cursor-pointer"
-                      onClick={() => router.push(`/vote?id=${vote.vote_id}`)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <span className="text-sm text-gray-600">Afstemning ID: {vote.vote_id}</span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className={`px-3 py-1 rounded text-sm font-semibold ${voteValueToBgColor(vote.entity1_vote)}`}>
-                            {getMEPName(comparedMep1Id)}: {voteValueToLabel(vote.entity1_vote)}
-                          </div>
-                          <div className={`px-3 py-1 rounded text-sm font-semibold ${voteValueToBgColor(vote.entity2_vote)}`}>
-                            {getMEPName(comparedMep2Id)}: {voteValueToLabel(vote.entity2_vote)}
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                  {comparison.disagreements.length > 50 && (
-                    <div className="text-center text-gray-600 py-4">
-                      Viser 50 af {comparison.disagreements.length} uenigheder
-                    </div>
-                  )}
-                </div>
-              </div>
+            {showDisagreements && (
+              <VoteList
+                title="Uenigheder"
+                votes={comparison.disagreements}
+                mep1Name={getMEPName(comparedMep1Id)}
+                mep2Name={getMEPName(comparedMep2Id)}
+              />
             )}
           </>
         )}

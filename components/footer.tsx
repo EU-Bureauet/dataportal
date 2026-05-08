@@ -1,14 +1,12 @@
-import { EUBureauetLogo } from './eu-bureauet-logo.tsx';
-
 export function Footer() {
   return (
     <footer className="bg-gradient-to-r from-blue-50 to-green-50 mt-auto">
       <div className="w-full px-6 py-8">
         <div className="max-w-6xl mx-auto grid gap-6 md:grid-cols-2">
             <p className="text-gray-600 leading-relaxed"><strong>Om EU-bureauets dataportal</strong><br />
-              Dataportalen er udviklet af <a href="/om-eu-bureauet/" className="hover:text-blue-800 underline">EU-bureauet</a> i samarbejde med analysebureauet <a href="https://www.ogtal.dk/" target="_blank" className="hover:text-blue-800 underline">Analyse & Tal</a>.
+              Dataportalen er udviklet af <a href="/om-eu-bureauet/" className="hover:text-blue-800 underline">EU-bureauet</a> i samarbejde med analysebureauet <a href="https://www.ogtal.dk/" target="_blank" rel="noreferrer" className="hover:text-blue-800 underline">Analyse & Tal</a>.
               Dataportalen er en del af projektet &quot;Dataværktøjer og analyser: Få styr på Europa-Parlamentet&quot;,
-              som har modtaget støtte fra <a href="https://slks.dk/omraader/folkeoplysning/europa-naevnet" target="_blank" className="hover:text-blue-800 underline">Europa-Nævnet</a>. Ansvar for indholdet er alene tilskudsmodtagers.
+              som har modtaget støtte fra <a href="https://slks.dk/omraader/folkeoplysning/europa-naevnet" target="_blank" rel="noreferrer" className="hover:text-blue-800 underline">Europa-Nævnet</a>. Ansvar for indholdet er alene tilskudsmodtagers.
             </p>
 
           <div className="text-gray-600">

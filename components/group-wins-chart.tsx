@@ -4,25 +4,13 @@ import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { GroupWinsData, type CommitteeAndGroupNames } from "@/types/data";
 import committeeNamesData from "@/data/committee_and_group_names.json";
+import { GROUP_COLORS } from "@/lib/group-colors";
 
 const committeeNames = committeeNamesData as CommitteeAndGroupNames;
 
 interface GroupWinsChartProps {
   data: GroupWinsData;
 }
-
-// EU Parliamentary group colors
-const GROUP_COLORS: { [key: string]: string } = {
-  "PPE": "#3399FF",
-  "S&D": "#FF0000",
-  "Renew": "#FFCC00",
-  "Verts/ALE": "#00CC00",
-  "ECR": "#0066CC",
-  "The Left": "#990000",
-  "ESN": "#000066",
-  "PfE": "#006699",
-  "NI": "#999999"
-};
 
 export function GroupWinsChart({ data }: GroupWinsChartProps) {
   const [selectedCommittee, setSelectedCommittee] = useState<string>("TOTAL");

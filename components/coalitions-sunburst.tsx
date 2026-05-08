@@ -3,23 +3,12 @@
 import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Coalition } from "@/types/data";
+import { GROUP_COLORS } from "@/lib/group-colors";
+import { categorizeCoalition, type FrequencyCategory } from "@/lib/data-transforms";
 
 interface CoalitionsSunburstProps {
   data: Coalition[];
 }
-
-// EU Parliamentary group colors
-const GROUP_COLORS: { [key: string]: string } = {
-  "PPE": "#3399FF",
-  "S&D": "#FF0000",
-  "Renew": "#FFCC00",
-  "Verts/ALE": "#00CC00",
-  "ECR": "#0066CC",
-  "The Left": "#990000",
-  "ESN": "#000066",
-  "PfE": "#006699",
-  "NI": "#999999"
-};
 
 // Frequency category colors (using theme colors)
 const CATEGORY_COLORS = {
@@ -29,22 +18,12 @@ const CATEGORY_COLORS = {
   "Rare": "#adcdea"          // Blue - <2%
 };
 
-type FrequencyCategory = "Dominant" | "Common" | "Uncommon" | "Rare";
-
 // Danish translations for category names
 const CATEGORY_NAMES_DA: { [key in FrequencyCategory]: string } = {
   "Dominant": "Dominerende",
   "Common": "Almindelig",
   "Uncommon": "Mindre Almindelig",
   "Rare": "Sjælden"
-};
-
-// Categorize coalitions by frequency
-const categorizeCoalition = (percentage: number): FrequencyCategory => {
-  if (percentage >= 20) return "Dominant";
-  if (percentage >= 5) return "Common";
-  if (percentage >= 2) return "Uncommon";
-  return "Rare";
 };
 
 export function CoalitionsSunburst({ data }: CoalitionsSunburstProps) {

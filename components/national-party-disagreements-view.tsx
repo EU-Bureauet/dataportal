@@ -1,39 +1,16 @@
 "use client"
 
 import React, { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { Card } from "@/components/ui/card";
 import { NationalPartyDisagreementsData, extractCountryFromPartyName } from "@/types/data";
+import { GROUP_COLORS } from "@/lib/group-colors";
+import { PartyDetailView } from "@/components/national-party-disagreements-sections";
 
 interface NationalPartyDisagreementsViewProps {
   data: NationalPartyDisagreementsData;
 }
 
-// EU Parliamentary group colors
-const GROUP_COLORS: { [key: string]: string } = {
-  "PPE": "#3399FF",
-  "S&D": "#FF0000",
-  "Renew": "#FFCC00",
-  "Verts/ALE": "#00CC00",
-  "ECR": "#0066CC",
-  "The Left": "#990000",
-  "ESN": "#000066",
-  "PfE": "#006699",
-  "Greens/EFA": "#00CC00",
-  "PPE-DE": "#3399FF",
-  "Group of the European People's Party (Christian Democrats)": "#3399FF",
-  "Progressive Alliance of Socialists and Democrats": "#FF0000",
-  "Renew Europe Group": "#FFCC00",
-  "Greens/European Free Alliance": "#00CC00",
-  "European Conservatives and Reformists Group": "#0066CC",
-  "The Left group in the European Parliament - GUE/NGL": "#990000",
-  "Europe of Sovereign Nations Group": "#000066",
-  "Patriots for Europe Group": "#006699",
-  "NI": "#999999"
-};
-
 export function NationalPartyDisagreementsView({ data }: NationalPartyDisagreementsViewProps) {
-  const router = useRouter();
   const [selectedCountry, setSelectedCountry] = useState<string>("all");
   const [selectedParty, setSelectedParty] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -253,200 +230,15 @@ export function NationalPartyDisagreementsView({ data }: NationalPartyDisagreeme
 
       {/* Detailed View for Selected Party */}
       {selectedParty && selectedPartyData && (
-        <>
-          <Card className="p-6">
-            <button
-              onClick={() => {
-                setSelectedParty(null);
-                setExpandedVote(null);
-              }}
-              className="mb-4 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-md text-sm font-medium"
-            >
-              ← Tilbage til oversigt
-            </button>
-
-            <div className="border-b pb-4 mb-4">
-              <div className="flex items-start justify-between mb-2">
-                <h2 className="text-2xl font-bold">{selectedPartyData.partyName}</h2>
-                <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded">
-                  {selectedPartyData.country}
-                </span>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-red-50 p-4 rounded-lg">
-                  <div className="text-3xl font-bold text-red-600">
-                    {selectedPartyData.data.disagreement_statistics.disagreement_rate_percent.toFixed(1)}%
-                  </div>
-                  <div className="text-sm text-gray-600">Uenighedsprocent</div>
-                </div>
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="text-3xl font-bold text-blue-600">
-                    {selectedPartyData.data.disagreement_statistics.total_disagreements}
-                  </div>
-                  <div className="text-sm text-gray-600">Totale uenigheder</div>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <div className="text-3xl font-bold text-green-600">
-                    {selectedPartyData.data.disagreement_statistics.total_votes_analyzed}
-                  </div>
-                  <div className="text-sm text-gray-600">Afstemninger analyseret</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Party Members */}
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3">Partimedlemmer</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {selectedPartyData.data.party_info.meps.map((mep) => {
-                  const groupColor = getGroupColor(mep.political_group);
-                  return (
-                    <div key={mep.mep_id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                      <div
-                        className="w-8 h-8 rounded-full border-2 border-white shadow-sm flex-shrink-0"
-                        style={{ backgroundColor: groupColor }}
-                        title={mep.political_group}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900">{mep.name}</div>
-                        <div className="text-xs text-gray-600 truncate">{mep.political_group}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </Card>
-
-          {/* Disagreement Votes */}
-          <div>
-            <h3 className="text-xl font-bold mb-4">
-              Afstemninger med uenighed ({selectedPartyData.data.disagreement_votes.length})
-            </h3>
-            <div className="space-y-4">
-              {selectedPartyData.data.disagreement_votes.map((vote) => (
-                <Card
-                  key={vote.vote_id}
-                  className="p-6 hover:shadow-lg transition-shadow cursor-pointer"
-                  onClick={() => router.push(`/vote?id=${vote.vote_id}`)}
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-2 hover:text-blue-600">
-                        {vote.vote_description}
-                      </h4>
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <span>{vote.sitting_date}</span>
-                        <span>•</span>
-                        <span>{vote.participating_meps} af {vote.total_party_meps} medlemmer deltog</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExpandedVote(expandedVote === vote.vote_id ? null : vote.vote_id);
-                      }}
-                      className="ml-4 px-3 py-1 bg-blue-100 hover:bg-blue-200 rounded text-sm font-medium text-blue-700"
-                    >
-                      {expandedVote === vote.vote_id ? "Skjul detaljer" : "Vis detaljer"}
-                    </button>
-                  </div>
-
-                  {/* Vote Summary */}
-                  <div className="grid grid-cols-3 gap-4 mb-4">
-                    {vote.vote_breakdown.For && vote.vote_breakdown.For.length > 0 && (
-                      <div className="bg-green-50 p-3 rounded">
-                        <div className="text-lg font-bold text-green-700">
-                          {vote.vote_breakdown.For.length}
-                        </div>
-                        <div className="text-xs text-gray-600">For</div>
-                      </div>
-                    )}
-                    {vote.vote_breakdown.Against && vote.vote_breakdown.Against.length > 0 && (
-                      <div className="bg-red-50 p-3 rounded">
-                        <div className="text-lg font-bold text-red-700">
-                          {vote.vote_breakdown.Against.length}
-                        </div>
-                        <div className="text-xs text-gray-600">Imod</div>
-                      </div>
-                    )}
-                    {vote.vote_breakdown.Abstention && vote.vote_breakdown.Abstention.length > 0 && (
-                      <div className="bg-yellow-50 p-3 rounded">
-                        <div className="text-lg font-bold text-yellow-700">
-                          {vote.vote_breakdown.Abstention.length}
-                        </div>
-                        <div className="text-xs text-gray-600">Undlod</div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Expanded Details */}
-                  {expandedVote === vote.vote_id && (
-                    <div className="mt-4 pt-4 border-t space-y-4">
-                      {/* For votes */}
-                      {vote.vote_breakdown.For && vote.vote_breakdown.For.length > 0 && (
-                        <div>
-                          <div className="text-sm font-semibold text-green-700 mb-2">
-                            Stemte for ({vote.vote_breakdown.For.length}):
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {vote.vote_breakdown.For.map((mepName) => (
-                              <span
-                                key={mepName}
-                                className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm"
-                              >
-                                {mepName}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Against votes */}
-                      {vote.vote_breakdown.Against && vote.vote_breakdown.Against.length > 0 && (
-                        <div>
-                          <div className="text-sm font-semibold text-red-700 mb-2">
-                            Stemte imod ({vote.vote_breakdown.Against.length}):
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {vote.vote_breakdown.Against.map((mepName) => (
-                              <span
-                                key={mepName}
-                                className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm"
-                              >
-                                {mepName}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Abstention votes */}
-                      {vote.vote_breakdown.Abstention && vote.vote_breakdown.Abstention.length > 0 && (
-                        <div>
-                          <div className="text-sm font-semibold text-yellow-700 mb-2">
-                            Undlod at stemme ({vote.vote_breakdown.Abstention.length}):
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {vote.vote_breakdown.Abstention.map((mepName) => (
-                              <span
-                                key={mepName}
-                                className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm"
-                              >
-                                {mepName}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </Card>
-              ))}
-            </div>
-          </div>
-        </>
+        <PartyDetailView
+          partyData={selectedPartyData}
+          expandedVote={expandedVote}
+          setExpandedVote={setExpandedVote}
+          onBack={() => {
+            setSelectedParty(null);
+            setExpandedVote(null);
+          }}
+        />
       )}
 
       {filteredParties.length === 0 && !selectedParty && (

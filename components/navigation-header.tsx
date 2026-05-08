@@ -1,8 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import Link from 'next/link';
 import { EUBureauetLogo } from './eu-bureauet-logo.tsx';
+import forsvarTheme from '@/data/themes/forsvar.json';
+import miljoeTheme from '@/data/themes/miljoe.json';
+import energiTheme from '@/data/themes/energi.json';
 
 const navigationLinks = [
   { href: '/', label: 'Dataportal' },
@@ -17,6 +20,14 @@ const navigationLinks = [
   { href: '/winning-coalitions', label: 'Vindende koalitioner' },
   { href: '/national-party-disagreements', label: 'Partiuenigheder' },
 ];
+
+const allThemeLinks = [
+  { href: `/tema/${forsvarTheme.slug}`, label: forsvarTheme.title, published: forsvarTheme.published },
+  { href: `/tema/${miljoeTheme.slug}`, label: miljoeTheme.title, published: miljoeTheme.published },
+  { href: `/tema/${energiTheme.slug}`, label: energiTheme.title, published: energiTheme.published },
+];
+
+const themeLinks = allThemeLinks.filter((t) => t.published === true);
 
 export function NavigationHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -70,16 +81,38 @@ export function NavigationHeader() {
             aria-hidden={!isMenuOpen}
           >
             <ul className="py-2">
-              {navigationLinks.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="block px-6 py-3 text-gray-800 hover:bg-gray-100 transition-colors border-l-4 border-transparent hover:border-blue-500 hover:text-blue-600"
-                    onClick={closeMenu}
-                  >
-                    {link.label}
-                  </Link>
-                </li>
+              {navigationLinks.map((link, index) => (
+                <Fragment key={link.href}>
+                  <li>
+                    <Link
+                      href={link.href}
+                      className="block px-6 py-3 text-gray-800 hover:bg-gray-100 transition-colors border-l-4 border-transparent hover:border-blue-500 hover:text-blue-600"
+                      onClick={closeMenu}
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                  {index === 0 && themeLinks.length > 0 && (
+                    <>
+                      <li>
+                        <span className="block px-6 py-2 text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                          Temaer
+                        </span>
+                      </li>
+                      {themeLinks.map((theme) => (
+                        <li key={theme.href}>
+                          <Link
+                            href={theme.href}
+                            className="block pl-10 pr-6 py-2 text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent hover:border-blue-500 hover:text-blue-600 text-sm"
+                            onClick={closeMenu}
+                          >
+                            {theme.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </>
+                  )}
+                </Fragment>
               ))}
             </ul>
           </nav>

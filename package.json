@@ -4,21 +4,29 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "prebuild": "node scripts/sync-theme-tag-ids.mjs",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint && tsc --noemit",
+    "start": "npx serve out -l 3000",
+    "lint": "eslint . && tsc --noemit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "sync-theme-tag-ids": "node scripts/sync-theme-tag-ids.mjs",
     "package": "next build && cd out && tar -cf ../build-$(date +%Y-%m-%d-%s).tar.gz *"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-tabs": "^1.1.13",
+    "@types/d3": "^7.4.3",
+    "@types/d3-cloud": "^1.2.9",
     "@types/papaparse": "^5.5.2",
     "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "country-flag-icons": "^1.6.8",
+    "d3": "^7.9.0",
+    "d3-cloud": "^1.2.9",
     "lucide-react": "^0.542.0",
-    "next": "15.5.2",
+    "next": "^15.5.15",
     "papaparse": "^5.5.3",
     "react": "19.1.0",
     "react-chartjs-2": "^5.3.1",
@@ -28,15 +36,17 @@
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.2",
+    "eslint-plugin-security": "^4.0.0",
+    "eslint-plugin-sonarjs": "^4.0.2",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.7",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.4"
   }
 }

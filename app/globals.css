@@ -41,10 +41,30 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  /* Political group Tailwind colors (e.g. bg-group-ppe, text-group-sd) */
+  --color-group-ppe: var(--group-ppe);
+  --color-group-sd: var(--group-sd);
+  --color-group-renew: var(--group-renew);
+  --color-group-verts-ale: var(--group-verts-ale);
+  --color-group-ecr: var(--group-ecr);
+  --color-group-the-left: var(--group-the-left);
+  --color-group-esn: var(--group-esn);
+  --color-group-pfe: var(--group-pfe);
+  --color-group-ni: var(--group-ni);
 }
 
 :root {
   --radius: 0.625rem;
+  /* Political group colors — single source of truth for CSS/Tailwind */
+  --group-ppe: #3399FF;
+  --group-sd: #FF0000;
+  --group-renew: #FFCC00;
+  --group-verts-ale: #00CC00;
+  --group-ecr: #0066CC;
+  --group-the-left: #990000;
+  --group-esn: #000066;
+  --group-pfe: #006699;
+  --group-ni: #999999;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -119,4 +139,20 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Thin scrollbar for sidebar overflow */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: #d1d5db;
+  border-radius: 2px;
 }

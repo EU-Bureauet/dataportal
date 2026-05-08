@@ -3,69 +3,19 @@
 import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { PairwiseCoalition } from "@/types/data";
+import { buildMatrixFromPairwise, getHeatmapColor, HEATMAP_GROUP_LABELS } from "@/lib/data-transforms";
 
 interface HeatmapGridProps {
   data: PairwiseCoalition[];
   filterComponent?: React.ReactNode;
 }
 
-// Labels for rows and columns - using the 8 groups
-const groupLabels = ['PPE', 'S&D', 'Renew', 'Verts/ALE', 'ECR', 'The Left', 'ESN', 'PfE'];
+const groupLabels = [...HEATMAP_GROUP_LABELS];
 
-// Build matrix from pairwise data
-const buildMatrixFromPairwise = (pairwiseData: PairwiseCoalition[]): number[][] => {
-  const matrix: number[][] = Array(8).fill(0).map(() => Array(8).fill(0));
-
-  // Create a map for quick lookup
-  const dataMap = new Map<string, number>();
-  pairwiseData.forEach(item => {
-    const [group1, group2] = item["Group Pair"];
-    const key = `${group1}-${group2}`;
-    const reverseKey = `${group2}-${group1}`;
-    dataMap.set(key, item.Percentage);
-    dataMap.set(reverseKey, item.Percentage);
-  });
-
-  // Fill the matrix
-  for (let i = 0; i < 8; i++) {
-    for (let j = 0; j < 8; j++) {
-      if (i === j) {
-        // Diagonal - same group always agrees with itself
-        matrix[i][j] = 100;
-      } else {
-        const key = `${groupLabels[i]}-${groupLabels[j]}`;
-        matrix[i][j] = dataMap.get(key) || 0;
-      }
-    }
-  }
-
-  return matrix;
-};
-
-// Get color based on value (0-100)
-const getColor = (value: number): string => {
-  // Use theme colors: #80d8a8 (green), #ffff80 (yellow), #adcdea (blue)
-
-  if (value >= 80) {
-    return '#80d8a8'; // Strong green
-  } else if (value >= 60) {
-    return '#a8e0b8'; // Medium green
-  } else if (value >= 40) {
-    return '#ffff80'; // Yellow
-  } else if (value >= 20) {
-    return '#ffd9a8'; // Light orange
-  } else {
-    return '#adcdea'; // Blue
-  }
-};
+const getColor = getHeatmapColor;
 
 // Get text color based on background brightness
-const getTextColor = (bgColor: string): string => {
-  // For most of our colors, dark text works well
-  // Only use white text for very dark backgrounds
-  if (bgColor === '#80d8a8' || bgColor === '#a8e0b8') {
-    return '#1f2937'; // dark gray
-  }
+const getTextColor = (_bgColor: string): string => {
   return '#1f2937'; // dark gray for all
 };
 
