@@ -129,7 +129,7 @@ Nøglen `theme_<key>` (fx `theme_forsvar_sikkerhed`) er den samme på tværs af 
 |-----|------|----------------|
 | `themes/energi.json` | Energi og industri | ITRE |
 | `themes/forsvar.json` | Forsvar og sikkerhed | SEDE |
-| `themes/miljoe.json` | Miljø og klima | ENVI |
+| `themes/miljoe.json` | Miljø og sundhed | ENVI |
 
 Se [theme-admin-guide.md](theme-admin-guide.md) for konfigurationsdetaljer.
 
