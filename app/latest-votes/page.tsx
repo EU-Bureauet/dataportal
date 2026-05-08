@@ -4,6 +4,7 @@ import React, { Suspense, useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { VoteGroupCard, FilterPanel, useDocDeepLink, type VoteGroup } from "./components";
+import { matchThemeDataset } from "@/lib/theme-datasets";
 
 interface Vote {
   vote_id: string;
@@ -75,35 +76,6 @@ const sortVotesByNewest = (votes: Vote[]): Vote[] => {
 };
 
 const ITEMS_PER_PAGE = 25;
-
-/** When the latest-votes page is reached from a theme card, the URL carries
- * a fixed (search, eurovoc) combo. We swap the global `latest_votes.json`
- * for the theme's curated dataset and surface the theme label in the page
- * heading. Keys are `"<search>|<eurovoc>"` (lower-cased) and must match the
- * `href` defined on the theme JSON's "Liste over afstemninger" visualisation. */
-interface ThemeDatasetEntry {
-  file: string;
-  label: string;
-}
-const THEME_DATASETS: Record<string, ThemeDatasetEntry> = {
-  "forsvar|forsvarspolitik": {
-    file: "theme_votes_forsvar_sikkerhed.json",
-    label: "Forsvar og sikkerhed",
-  },
-  "milj\u00f8|milj\u00f8politik": {
-    file: "theme_votes_miljo_sundhed.json",
-    label: "Milj\u00f8 og sundhed",
-  },
-  "energi|energipolitik": {
-    file: "theme_votes_energi_industri.json",
-    label: "Energi og industri",
-  },
-};
-
-function matchThemeDataset(search: string | null, eurovoc: string | null): ThemeDatasetEntry | null {
-  if (!search || !eurovoc) return null;
-  return THEME_DATASETS[`${search.toLowerCase()}|${eurovoc.toLowerCase()}`] ?? null;
-}
 
 /** Theme datasets store the date once on the document but omit per-vote
  * `sitting_date`. Inject it so downstream code (sorting, grouping) can stay

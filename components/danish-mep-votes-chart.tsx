@@ -5,6 +5,7 @@ import useSWR from "swr";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { GROUP_COLORS } from "@/lib/group-colors";
+import { matchThemeDataset } from "@/lib/theme-datasets";
 import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
 
 // ─── Local photo helper ──────────────────────────────────────────────────────
@@ -396,13 +397,21 @@ export function DanishMEPVotesChart() {
 
   const basePath = process.env.NEXT_PUBLIC_BASEPATH ? `/${process.env.NEXT_PUBLIC_BASEPATH}` : "";
 
+  // When the URL carries a recognised (search, eurovoc) theme combo we swap
+  // the global `latest_votes.json` for the curated theme dataset so this page
+  // is consistent with /tema/* and /latest-votes (same set of votes).
+  const themeDataset = matchThemeDataset(searchFilter, eurovocFilter);
+  const votesUrl = themeDataset
+    ? `${basePath}/data/${themeDataset.file}`
+    : `${basePath}/data/latest_votes.json`;
+
   const { data: mepData } = useSWR<{ meps: MEPClean[] }>(`${basePath}/data/meps_clean.json`, fetcher);
   const { data: brudData } = useSWR<{ mep_vs_party: { disagreements: Disagreement[] } }>(
     `${basePath}/data/Danske_MEPs_brud_med_partigruppelinjen.json`,
     fetcher
   );
   const { data: latestVotes } = useSWR<{ documents: LatestVotesDoc[] }>(
-    `${basePath}/data/latest_votes.json`,
+    votesUrl,
     fetcher
   );
   const { data: tooltipData } = useSWR<{ groups: { code: string; description: string }[] }>(
@@ -434,9 +443,15 @@ export function DanishMEPVotesChart() {
     return map;
   }, [latestVotes]);
 
-  // Count total topic-relevant vote IDs (used for per-topic loyalty)
+  // Count total topic-relevant vote IDs (used for per-topic loyalty).
+  // When a theme dataset is loaded, every vote in that file is by definition
+  // part of the theme — no further keyword filtering needed. Without a theme
+  // match we fall back to keyword matching against `latest_votes.json`.
   const topicVoteIds = useMemo(() => {
     if (!voteTopicMap || (!searchFilter && !eurovocFilter)) return null;
+    if (themeDataset) {
+      return new Set(voteTopicMap.keys());
+    }
     const ids = new Set<string>();
     for (const [vid, keywords] of voteTopicMap.entries()) {
       if (eurovocFilter && keywords.some((kw) => kw.toLowerCase() === eurovocFilter.toLowerCase())) {
@@ -452,7 +467,7 @@ export function DanishMEPVotesChart() {
       }
     }
     return ids;
-  }, [voteTopicMap, searchFilter, eurovocFilter]);
+  }, [voteTopicMap, searchFilter, eurovocFilter, themeDataset]);
 
   // Build MEP summaries
   const summaries = useMemo((): MEPSummary[] => {
@@ -467,20 +482,25 @@ export function DanishMEPVotesChart() {
       // Apply topic filter via search/eurovoc if provided
       let filtered = mepDisag;
       if ((searchFilter || eurovocFilter) && voteTopicMap) {
-        /* eslint-disable sonarjs/no-nested-functions -- filter/some callbacks inside useMemo.map() */
-        filtered = mepDisag.filter((d) => {
-          const keywords = voteTopicMap.get(d["Vote ID"]);
-          if (!keywords) return false;
-          if (eurovocFilter && keywords.some((kw) => kw.toLowerCase() === eurovocFilter.toLowerCase())) return true;
-          if (searchFilter) {
-            // eslint-disable-next-line security/detect-non-literal-regexp -- input is fully escaped
-            const re = new RegExp(searchFilter.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-            const fields = [d["Short Title"], d["Document Title"], ...keywords];
-            return fields.some((f) => re.test(f));
-          }
-          return false;
-        });
-        /* eslint-enable sonarjs/no-nested-functions */
+        if (themeDataset) {
+          // Theme dataset = curated vote list; membership alone implies in-topic.
+          filtered = mepDisag.filter((d) => voteTopicMap.has(d["Vote ID"]));
+        } else {
+          /* eslint-disable sonarjs/no-nested-functions -- filter/some callbacks inside useMemo.map() */
+          filtered = mepDisag.filter((d) => {
+            const keywords = voteTopicMap.get(d["Vote ID"]);
+            if (!keywords) return false;
+            if (eurovocFilter && keywords.some((kw) => kw.toLowerCase() === eurovocFilter.toLowerCase())) return true;
+            if (searchFilter) {
+              // eslint-disable-next-line security/detect-non-literal-regexp -- input is fully escaped
+              const re = new RegExp(searchFilter.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+              const fields = [d["Short Title"], d["Document Title"], ...keywords];
+              return fields.some((f) => re.test(f));
+            }
+            return false;
+          });
+          /* eslint-enable sonarjs/no-nested-functions */
+        }
       }
 
       // Compute allies when breaking ranks
@@ -512,7 +532,7 @@ export function DanishMEPVotesChart() {
         topicVoteCount: topicVoteIds ? topicVoteIds.size : 0,
       };
     });
-  }, [mepData, brudData, voteTopicMap, searchFilter, eurovocFilter, topicVoteIds]);
+  }, [mepData, brudData, voteTopicMap, searchFilter, eurovocFilter, topicVoteIds, themeDataset]);
 
   // Sort by most breaks
   const sorted = useMemo(() => {
