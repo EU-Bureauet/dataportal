@@ -619,7 +619,7 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
                 // height so the number + label pair sits visually centered.
                 const groupOffsetY = -labelFontSize * 0.6;
                 return (
-                  <g transform={`translate(${layout.cx}, ${layout.cy + groupOffsetY})`}>
+                  <g transform={`translate(${layout.cx ?? 0}, ${(layout.cy ?? 0) + groupOffsetY})`}>
                     <text
                       textAnchor="middle"
                       dominantBaseline="central"

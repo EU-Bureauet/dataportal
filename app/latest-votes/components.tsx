@@ -247,7 +247,7 @@ export function FilterPanel({
   selectedMep, setSelectedMep,
   committeeCounts, hasMoreCommittees, onShowMoreCommittees,
   eurovocCounts, hasMoreEurovoc, onShowMoreEurovoc,
-  hasActiveSearch, totalVotesFound, filteredGroupsCount,
+  hasActiveSearch: _hasActiveSearch, totalVotesFound, filteredGroupsCount,
 }: FilterPanelProps) {
   return (
     <>
