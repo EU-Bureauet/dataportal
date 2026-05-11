@@ -44,6 +44,8 @@ interface Slice {
   text: string;
   href: string;
   weight: number;
+  /** Number of distinct afstemninger (ballots) for the document. */
+  voteCount: number;
   documentReference: string;
 }
 
@@ -93,16 +95,20 @@ function buildSlices(docs: ThemeVoteDocument[], search?: string, eurovoc?: strin
       }
     }
     if (weight === 0) weight = doc.voteCount ?? 1;
+    // Number of distinct afstemninger (ballots) for this document.
+    const voteCount = doc.votes?.length ?? doc.voteCount ?? 1;
 
     const existing = map.get(label);
     if (existing) {
       existing.weight += weight;
+      existing.voteCount += voteCount;
     } else {
       const documentReference = doc.document_reference || "";
       map.set(label, {
         key: documentReference || label,
         text: label,
         weight,
+        voteCount,
         documentReference,
         href: buildSliceHref(label, documentReference, search, eurovoc),
       });
@@ -300,7 +306,8 @@ interface DonutTooltipState {
   x: number;
   y: number;
   text: string;
-  weight: number;
+  /** Number of afstemninger (ballots) for the slice. */
+  voteCount: number;
   href?: string;
 }
 
@@ -375,7 +382,7 @@ function DonutTooltip({
     >
       <div className="font-medium leading-snug">{tooltip.text}</div>
       <div className="mt-0.5 text-[0.65rem] text-gray-300">
-        {tooltip.weight.toLocaleString("da-DK")} stemmer
+        {tooltip.voteCount.toLocaleString("da-DK")} antal afstemninger
       </div>
       {tooltip.href && (
         <a
@@ -408,7 +415,7 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
   // tooltip relative to the chart container. Defined once and reused by
   // both donut slices and labels.
   const makeTooltipHandler = useCallback(
-    (text: string, weight: number) =>
+    (text: string, voteCount: number) =>
       (e: React.MouseEvent<SVGElement>) => {
         const rect = containerRef.current?.getBoundingClientRect();
         if (!rect) return;
@@ -416,7 +423,7 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
           x: e.clientX - rect.left,
           y: e.clientY - rect.top,
           text,
-          weight,
+          voteCount,
         });
       },
     [],
@@ -535,7 +542,7 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
               <g transform={`translate(${layout.cx}, ${layout.cy})`} filter="url(#theme-donut-shadow)">
                 {layout.labels.map((s) => {
                   const d = arcGen({ ...s } as LabelLayout);
-                  const showTooltip = makeTooltipHandler(s.text, s.weight);
+                  const showTooltip = makeTooltipHandler(s.text, s.voteCount);
                   const isHovered = hoveredKey === s.key;
                   // Pop the hovered slice slightly outward along its mid-angle
                   // for a tactile, professional feel.
@@ -557,7 +564,7 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
                       x: e.clientX - rect.left,
                       y: e.clientY - rect.top,
                       text: s.text,
-                      weight: s.weight,
+                      voteCount: s.voteCount,
                       href: s.href,
                     });
                   };
@@ -642,7 +649,7 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
               {width >= 480 && (
                 <g>
                   {layout.labels.filter((s) => s.showLabel).map((s) => {
-                    const showTooltip = makeTooltipHandler(s.text, s.weight);
+                    const showTooltip = makeTooltipHandler(s.text, s.voteCount);
                     return (
                     <g key={`label-${s.key}`}>
                       <polyline
