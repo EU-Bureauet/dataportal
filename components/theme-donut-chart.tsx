@@ -613,11 +613,16 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
                 const radiusBasedFontSize = innerR * 0.55;
                 const numberFontSize = Math.max(14, Math.min(34, widthBasedFontSize, radiusBasedFontSize));
                 const labelFontSize = Math.max(8, Math.min(12, innerR * 0.18));
+                // Position the number on the geometric center using
+                // `dominantBaseline="central"`, then place the unit label just
+                // below it. We nudge the whole group up by half the label's
+                // height so the number + label pair sits visually centered.
+                const groupOffsetY = -labelFontSize * 0.6;
                 return (
-                  <g transform={`translate(${layout.cx}, ${layout.cy})`}>
+                  <g transform={`translate(${layout.cx}, ${layout.cy + groupOffsetY})`}>
                     <text
                       textAnchor="middle"
-                      dy="-0.15em"
+                      dominantBaseline="central"
                       style={{
                         fontSize: `${numberFontSize}px`,
                         fontWeight: 800,
@@ -629,7 +634,8 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
                     </text>
                     <text
                       textAnchor="middle"
-                      dy="1.2em"
+                      dominantBaseline="hanging"
+                      y={numberFontSize * 0.55}
                       style={{
                         fontSize: `${labelFontSize}px`,
                         fill: "#6b7280",
