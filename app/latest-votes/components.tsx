@@ -310,7 +310,7 @@ export function FilterPanel({
           placeholder="Søg efter titel, emneord, udvalg eller afstemning..."
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
         />
-        {hasActiveSearch && (
+        {filteredGroupsCount > 0 && (
           <p className="mt-2 text-sm text-gray-600">
             {totalVotesFound} afstemning{totalVotesFound === 1 ? "" : "er"} fordelt på {filteredGroupsCount} sag
             {filteredGroupsCount === 1 ? "" : "er"}.
