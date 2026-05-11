@@ -20,6 +20,7 @@ interface ThemeVotesMetadata {
   theme_label?: string;
   theme_definition?: string;
   theme_description?: string;
+  documents_total?: number;
 }
 
 export interface ThemeVotesData {
@@ -595,7 +596,9 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
                   always fit inside the inner circle. */}
               {(() => {
                 const innerR = layout.innerRadius ?? 60;
-                const totalText = layout.totalVotes.toLocaleString("da-DK");
+                const documentsTotal = meta.documents_total ?? layout.labels.length;
+                const totalText = documentsTotal.toLocaleString("da-DK");
+                const unitLabel = documentsTotal === 1 ? "Sag" : "Sager";
                 // Available width inside the inner circle (with a little side padding).
                 const maxTextWidth = innerR * 2 * 0.82;
                 // Approx average glyph width ratio for a bold sans-serif numeral.
@@ -627,7 +630,7 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
                         textTransform: "uppercase",
                       }}
                     >
-                      Stemmer i alt
+                      {unitLabel}
                     </text>
                   </g>
                 );
