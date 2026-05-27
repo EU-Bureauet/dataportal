@@ -43,6 +43,7 @@ const fetcher = async (url: string) => {
 
 const MAX_ROWS = 10;
 
+// eslint-disable-next-line complexity -- component combines multiple data/loading/toggle states in one chart renderer
 export function FrequentCoalitionsBarChart({
   committee,
   themeLabel,

@@ -1,5 +1,3 @@
-const currentYear = new Date().getFullYear();
-
 function LinkedInIcon({ className }: Readonly<{ className?: string }>) {
   // Refined LinkedIn monogram: bare "in" letterform without the surrounding
   // brand-block chrome — sits cleanly inside the circular button.

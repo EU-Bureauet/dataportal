@@ -402,6 +402,7 @@ function MEPDetailPanel({
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
+// eslint-disable-next-line max-lines-per-function -- large UI container; split is planned but kept intact to avoid behavior regressions
 export function DanishMEPVotesChart() {
   const searchParams = useSearchParams();
   const searchFilter = searchParams.get("search") ?? undefined;
