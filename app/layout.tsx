@@ -19,7 +19,9 @@ export const metadata: Metadata = {
   title: "Få styr på Europa-Parlamentet",
   description: "Viden om afstemninger og lovgivning i Europa-Parlamentet",
   icons: {
-    icon: "/favicon.png",
+    icon: [{ url: "/favicon.png?v=2", type: "image/png" }],
+    shortcut: "/favicon.png?v=2",
+    apple: "/favicon.png?v=2",
   },
 };
 

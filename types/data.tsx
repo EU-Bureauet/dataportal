@@ -40,6 +40,7 @@ export interface PairwiseCoalition {
     "Total": number;
     "Count": number;
     "Percentage": number;
+  theme_counts?: Record<string, number>;
 }
 
 export interface PairwiseCoalitionsData {

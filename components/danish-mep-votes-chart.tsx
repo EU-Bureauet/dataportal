@@ -48,7 +48,7 @@ interface MEPClean {
   photo_url: string;
   country_code: string;
   national_party_id: { name: string; code: string };
-  current_group_id: { name: string; code: string };
+  current_group_id?: { name: string; code: string };
   n_votes: number;
   n_votes_with_group: number;
   n_votes_against_group: number;
@@ -180,6 +180,14 @@ function LoyaltyBar({ against, total, participationPct }: Readonly<{ against: nu
   const activePct = 100 - absentPct;
   const loyalPct = total > 0 ? ((total - against) / total) * activePct : activePct;
   const againstPct = total > 0 ? (against / total) * activePct : 0;
+  const loyalCount = Math.max(0, total - against);
+  const totalLabel = total.toLocaleString("da-DK");
+  const loyalLabel = loyalCount.toLocaleString("da-DK");
+  const againstLabel = against.toLocaleString("da-DK");
+  const estimatedAbsentCount =
+    hasAbsent && participationPct && participationPct > 0
+      ? Math.max(0, Math.round(total / (participationPct / 100)) - total)
+      : null;
 
   return (
     <div className="w-full">
@@ -187,18 +195,22 @@ function LoyaltyBar({ against, total, participationPct }: Readonly<{ against: nu
         <div
           className="h-full bg-emerald-500 transition-all duration-500"
           style={{ width: `${loyalPct}%` }}
-          title={`${loyalPct.toFixed(1)}% med gruppen`}
+          title={`${loyalPct.toFixed(1)}% med gruppen (${loyalLabel} af ${totalLabel} afstemninger)`}
         />
         <div
           className="h-full bg-red-500 transition-all duration-500"
           style={{ width: `${againstPct}%` }}
-          title={`${againstPct.toFixed(1)}% brud`}
+          title={`${againstPct.toFixed(1)}% brud (${againstLabel} af ${totalLabel} afstemninger)`}
         />
         {hasAbsent && (
           <div
             className="h-full bg-gray-300 transition-all duration-500"
             style={{ width: `${absentPct}%` }}
-            title={`${absentPct.toFixed(1)}% fravær`}
+            title={
+              estimatedAbsentCount !== null
+                ? `${absentPct.toFixed(1)}% fravær (ca. ${estimatedAbsentCount.toLocaleString("da-DK")} afstemninger)`
+                : `${absentPct.toFixed(1)}% fravær`
+            }
           />
         )}
       </div>
@@ -349,7 +361,7 @@ function MEPDetailPanel({
         <div>
           <h3 className="text-xl font-bold text-gray-900">{summary.mep.full_name}</h3>
           <p className="text-sm text-gray-500">
-            {summary.mep.national_party_id.name} ({summary.mep.national_party_id.code}) · {summary.mep.current_group_id.name}
+            {summary.mep.national_party_id.name} ({summary.mep.national_party_id.code}) · {summary.mep.current_group_id?.name || "Ukendt gruppe"}
           </p>
           <p className="text-sm text-red-600 font-medium mt-0.5">
             {LABELS.breakCount.replace("{count}", String(list.length))}{list.length !== summary.totalDisagreements ? ` (af ${summary.totalDisagreements} i alt)` : ""}
@@ -360,12 +372,12 @@ function MEPDetailPanel({
       {/* Ally chart */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg">
         <h4 className="text-sm font-semibold text-gray-700 mb-3">{LABELS.allyHeading.replace("{name}", summary.mep.family_name)}</h4>
-        <AllyBar allies={summary.topAllies} mepGroup={summary.mep.current_group_id.code} groupDescriptions={groupDescriptions} />
+        <AllyBar allies={summary.topAllies} mepGroup={summary.mep.current_group_id?.code || "N/A"} groupDescriptions={groupDescriptions} />
       </div>
 
       {/* Vote list */}
       <div>
-        <h4 className="text-sm font-semibold text-gray-700 mb-3">{LABELS.voteListHeading.replace("{name}", summary.mep.family_name).replace("{group}", summary.mep.current_group_id.code)}</h4>
+        <h4 className="text-sm font-semibold text-gray-700 mb-3">{LABELS.voteListHeading.replace("{name}", summary.mep.family_name).replace("{group}", summary.mep.current_group_id?.code || "N/A")}</h4>
         <div className="divide-y divide-gray-100">
           {visible.map((d) => (
             <VoteRow key={`${d["Vote ID"]}-${d["Vote Description"]}`} d={d} groupCodes={GROUP_CODES} groupDescriptions={groupDescriptions} />
@@ -473,7 +485,7 @@ export function DanishMEPVotesChart() {
   const summaries = useMemo((): MEPSummary[] => {
     if (!mepData || !brudData) return [];
 
-    const dkMeps = mepData.meps.filter((m) => m.country_code.includes("DNK"));
+    const dkMeps = mepData.meps.filter((m) => m.country_code.includes("DNK") && m.current_group_id);
     const allDisag = brudData.mep_vs_party.disagreements;
 
     return dkMeps.map((mep) => {
@@ -508,7 +520,7 @@ export function DanishMEPVotesChart() {
       for (const d of filtered) {
         const mepVote = d["Vote Type"];
         for (const gc of GROUP_CODES) {
-          if (gc === mep.current_group_id.code) continue;
+          if (gc === mep.current_group_id?.code) continue;
           if (d[gc as keyof Disagreement] === mepVote) {
             allyMap[gc] = (allyMap[gc] || 0) + 1;
           }
@@ -564,16 +576,32 @@ export function DanishMEPVotesChart() {
   // ─── Overview ──────────────────────────────────────────────────────────────
 
   const hasTopicFilter = !!(searchFilter || eurovocFilter);
+  const hasThemeDataset = Boolean(themeDataset);
 
   return (
     <div>
       {/* Filter info */}
       {hasTopicFilter && (
         <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-          Filtreret efter:{" "}
-          {eurovocFilter && <span className="font-medium">{eurovocFilter}</span>}
-          {searchFilter && eurovocFilter && " + "}
-          {searchFilter && <span className="font-medium">&quot;{searchFilter}&quot;</span>}
+          {hasThemeDataset ? (
+            <>
+              Afgrænset til afstemningerne knyttet til temaet
+              {themeDataset?.label ? (
+                <>
+                  : <span className="font-medium">{themeDataset.label}</span>
+                </>
+              ) : (
+                "."
+              )}
+            </>
+          ) : (
+            <>
+              Filtreret efter:{" "}
+              {eurovocFilter && <span className="font-medium">{eurovocFilter}</span>}
+              {searchFilter && eurovocFilter && " + "}
+              {searchFilter && <span className="font-medium">&quot;{searchFilter}&quot;</span>}
+            </>
+          )}
         </div>
       )}
 
@@ -622,8 +650,8 @@ export function DanishMEPVotesChart() {
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-baseline gap-2 min-w-0">
                         <h3 className="font-semibold text-gray-900">{s.mep.full_name}</h3>
-                        <GroupBadge code={s.mep.current_group_id.code} description={groupDescriptions[s.mep.current_group_id.code]} pill>
-                          {s.mep.current_group_id.code}
+                        <GroupBadge code={s.mep.current_group_id?.code || "N/A"} description={groupDescriptions[s.mep.current_group_id?.code || "N/A"]} pill>
+                          {s.mep.current_group_id?.code || "Ukendt"}
                         </GroupBadge>
                       </div>
                       <span className="text-gray-400 flex-shrink-0">
@@ -703,7 +731,7 @@ export function DanishMEPVotesChart() {
                         <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-3">
                           {LABELS.accordionHeader.replace("{name}", s.mep.family_name)}
                         </p>
-                        <AllyBar allies={s.topAllies} mepGroup={s.mep.current_group_id.code} groupDescriptions={groupDescriptions} />
+                        <AllyBar allies={s.topAllies} mepGroup={s.mep.current_group_id?.code || "N/A"} groupDescriptions={groupDescriptions} />
                       </div>
                       <Link
                         href={(() => {
@@ -721,7 +749,7 @@ export function DanishMEPVotesChart() {
                     </>
                   ) : (
                     <p className="pt-4 text-sm text-gray-500 italic">
-                      {LABELS.noBreaks.replace("{fullName}", s.mep.full_name).replace("{group}", s.mep.current_group_id.code)}
+                      {LABELS.noBreaks.replace("{fullName}", s.mep.full_name).replace("{group}", s.mep.current_group_id?.code || "N/A")}
                     </p>
                   )}
                 </div>

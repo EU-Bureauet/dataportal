@@ -17,6 +17,7 @@ interface ThemeVisualisation {
   title: string;
   description: string;
   href: string;
+  ctaText?: string;
   dataSource?: {
     file: string;
     search?: string;
@@ -35,8 +36,14 @@ interface ThemeData {
   visualisations: ThemeVisualisation[];
 }
 
+function getProjectRoot(): string {
+  // During Next build/export workers, process.cwd() can resolve to a parent
+  // workspace. INIT_CWD keeps the original npm invocation directory.
+  return process.env.INIT_CWD ?? process.cwd();
+}
+
 function getThemesDir(): string {
-  return path.join(process.cwd(), "data", "themes");
+  return path.join(getProjectRoot(), "data", "themes");
 }
 
 function getThemeSlugs(): string[] {
@@ -55,109 +62,22 @@ function getThemeData(slug: string): ThemeData | null {
   return JSON.parse(raw) as ThemeData;
 }
 
-interface LatestVotesDoc {
-  short_title: string;
-  eurovoc_keywords: string[];
-  report: string;
-  committee: (string | number)[];
-  votes: { vote_description: string }[];
-}
-
-interface LatestVotesData {
-  documents: LatestVotesDoc[];
-  eurovoc: { label: string; voteCount: number }[];
-}
-
-interface PairwiseEntry {
-  "Group Pair": [string, string];
-  Total: number;
-  Count: number;
-  Percentage: number;
-}
-
-type PairwiseCoalitionsData = Record<string, PairwiseEntry[]>;
-
-function generateSubDescriptionLatestVotes(vis: ThemeVisualisation, data: LatestVotesData): string | undefined {
-  const searchTerm = vis.dataSource!.search?.toLowerCase();
-  const eurovocFilter = vis.dataSource!.eurovoc;
-
-  // Filter matching documents (same logic as the latest-votes page)
-  let docs = data.documents;
-  if (searchTerm) {
-    const regex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-    docs = docs.filter((doc) => {
-      const fields = [
-        doc.report,
-        doc.short_title,
-        ...doc.committee.map(String),
-        ...(doc.eurovoc_keywords || []),
-        ...doc.votes.map((v) => v.vote_description),
-      ];
-      return fields.some((f) => f && regex.test(f));
-    });
-  }
-  if (eurovocFilter) {
-    docs = docs.filter((doc) =>
-      doc.eurovoc_keywords?.includes(eurovocFilter)
-    );
-  }
-
-  if (docs.length === 0) return undefined;
-
-  const keywordCounts: Record<string, number> = {};
-  docs.forEach((doc) => {
-    (doc.eurovoc_keywords || []).forEach((kw) => {
-      keywordCounts[kw] = (keywordCounts[kw] || 0) + 1;
-    });
-  });
-  const topKeywords = Object.entries(keywordCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([kw]) => kw);
-
-  if (topKeywords.length === 0) return undefined;
-  return topKeywords.join(", ");
-}
-
-function generateSubDescriptionPairwise(vis: ThemeVisualisation, data: PairwiseCoalitionsData): string | undefined {
-  const committee = vis.dataSource!.committee;
-  if (!committee) return undefined;
-
-  const entries = data[committee];
-  if (!entries || entries.length === 0) return undefined;
-
-  // Collect unique group names
-  const groups = new Set<string>();
-  entries.forEach((entry) => {
-    entry["Group Pair"].forEach((g) => groups.add(g));
-  });
-
-  const sortedGroups = Array.from(groups).sort();
-  return sortedGroups.join(", ");
-}
-
-function generateSubDescription(vis: ThemeVisualisation): string | undefined {
-  if (!vis.dataSource) return undefined;
-  const dataPath = path.join(process.cwd(), "data", vis.dataSource.file);
-  if (!fs.existsSync(dataPath)) return undefined;
-
-  const raw = fs.readFileSync(dataPath, "utf-8");
-
-  if (vis.dataSource.file === "All_Pairwise_coalitions.json") {
-    return generateSubDescriptionPairwise(vis, JSON.parse(raw) as PairwiseCoalitionsData);
-  }
-
-  return generateSubDescriptionLatestVotes(vis, JSON.parse(raw) as LatestVotesData);
-}
-
-export function generateStaticParams() {
-  return getThemeSlugs()
+export async function generateStaticParams() {
+  const allSlugs = getThemeSlugs();
+  const publishedSlugs = allSlugs
     .filter((slug) => {
       const theme = getThemeData(slug);
       return theme?.published === true;
-    })
-    .map((slug) => ({ slug }));
+    });
+
+  // Static export fails when a dynamic route has no generated params.
+  // If all themes are currently unpublished, still emit params so export works.
+  const slugsToExport = publishedSlugs.length > 0 ? publishedSlugs : allSlugs;
+
+  return slugsToExport.map((slug) => ({ slug }));
 }
+
+export const dynamicParams = false;
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -202,7 +122,7 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
   let themeVotesData: ThemeVotesData | null = null;
   const themeVotesFilename = themeVotesFiles[theme.slug];
   if (themeVotesFilename) {
-    const themeVotesPath = path.join(process.cwd(), "data", themeVotesFilename);
+    const themeVotesPath = path.join(getProjectRoot(), "data", themeVotesFilename);
     if (fs.existsSync(themeVotesPath)) {
       themeVotesData = JSON.parse(fs.readFileSync(themeVotesPath, "utf-8")) as ThemeVotesData;
     }
@@ -234,7 +154,7 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
                   title={vis.title}
                   description={vis.description}
                   href={vis.href}
-                  subDescription={generateSubDescription(vis)}
+                  ctaText={vis.ctaText}
                   themeGradient={themeGradient}
                 />
               ))}
@@ -262,3 +182,4 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
     </div>
   );
 }
+

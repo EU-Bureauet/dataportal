@@ -16,6 +16,18 @@ const THEME_LABELS: Record<string, string> = {
   theme_forsvar_sikkerhed: "Forsvar og sikkerhed",
 };
 
+const THEME_VOTES_FILES: Record<string, string> = {
+  theme_energi_industri: "theme_votes_energi_industri.json",
+  theme_miljo_sundhed: "theme_votes_miljo_sundhed.json",
+  theme_forsvar_sikkerhed: "theme_votes_forsvar_sikkerhed.json",
+};
+
+interface ThemeVotesData {
+  metadata?: {
+    votes_total?: number;
+  };
+}
+
 export default function HeatmapPage() {
   return (
     <Suspense fallback={
@@ -42,14 +54,12 @@ function HeatmapContent() {
   const [initializedFromUrl, setInitializedFromUrl] = useState(false);
   useEffect(() => {
     if (initializedFromUrl) return;
-    if (isThemeMode && themeKey) {
-      setSelectedCommittee(themeKey);
-    } else {
-      const qCommittee = searchParams.get("committee");
-      if (qCommittee) setSelectedCommittee(qCommittee);
+    const qCommittee = searchParams.get("committee");
+    if (qCommittee) {
+      setSelectedCommittee(qCommittee);
     }
     setInitializedFromUrl(true);
-  }, [searchParams, initializedFromUrl, isThemeMode, themeKey]);
+  }, [searchParams, initializedFromUrl]);
 
   const fetcher = (url: string) => {
     return fetch(url).then(response => {
@@ -69,6 +79,14 @@ function HeatmapContent() {
     fetcher
   );
 
+  const themeVotesUrl = isThemeMode && themeKey
+    ? `/${basePath}/data/${THEME_VOTES_FILES[themeKey]}`
+    : null;
+  const { data: themeVotesData, isLoading: themeVotesLoading } = useSWR<ThemeVotesData>(
+    themeVotesUrl,
+    fetcher
+  );
+
   // Get available committees from the data (excluding theme groupings)
   const availableCommittees = useMemo(() => {
     if (!data) return [];
@@ -84,12 +102,39 @@ function HeatmapContent() {
   // Get the data for the selected committee
   const selectedData = useMemo(() => {
     if (!data) return null;
-    const result = data[selectedCommittee] || data.TOTAL;
-    console.log(`Selected committee: ${selectedCommittee}, data length: ${result?.length || 0}`);
-    return result;
-  }, [data, selectedCommittee]);
+    if (isThemeMode && themeKey) {
+      if (data[themeKey]) {
+        const result = data[themeKey];
+        console.log(`Selected key: ${themeKey}, data length: ${result?.length || 0}`);
+        return result;
+      }
 
-  if (isLoading) {
+      const sourceRows = data.TOTAL ?? [];
+      const themeId = themeKey.replace(/^theme_/, "");
+      const themeTotal = themeVotesData?.metadata?.votes_total;
+      if (!sourceRows.length || !themeTotal) return null;
+
+      const derivedRows = sourceRows.map((row) => {
+        const themeCount = row.theme_counts?.[themeId] ?? 0;
+        return {
+          ...row,
+          Total: themeTotal,
+          Count: themeCount,
+          Percentage: themeTotal > 0 ? Math.round((themeCount / themeTotal) * 1000) / 10 : 0,
+        };
+      });
+
+      console.log(`Derived theme data from TOTAL for ${themeKey}, data length: ${derivedRows.length}`);
+      return derivedRows;
+    }
+
+    const key = selectedCommittee;
+    const result = data[key] || data.TOTAL;
+    console.log(`Selected key: ${key}, data length: ${result?.length || 0}`);
+    return result;
+  }, [data, selectedCommittee, isThemeMode, themeKey, themeVotesData]);
+
+  if (isLoading || (isThemeMode && themeVotesLoading)) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-6 py-12">
@@ -150,6 +195,13 @@ function HeatmapContent() {
             Diagonalen viser 100% da hver gruppe altid er enig med sig selv.
           </p>
         </div>
+
+        {isThemeMode && !selectedData && (
+          <Card className="p-4 border-amber-300 bg-amber-50 text-amber-900">
+            Tema-data mangler i <strong>All_Pairwise_coalitions.json</strong> for nøglen <strong>{themeKey}</strong>.
+            Heatmap kan derfor ikke vises for dette tema endnu.
+          </Card>
+        )}
 
         {selectedData && (
           <HeatmapGrid

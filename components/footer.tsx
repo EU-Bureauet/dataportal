@@ -72,7 +72,7 @@ export function Footer() {
               Dataportalen er udviklet af{" "}
               <a
                 href="/om-eu-bureauet/"
-                className="font-medium text-gray-900 underline-offset-4 hover:text-blue-700 hover:underline"
+                className="text-gray-900 underline-offset-4 hover:text-blue-700 hover:underline"
               >
                 EU-bureauet
               </a>{" "}
@@ -81,7 +81,7 @@ export function Footer() {
                 href="https://www.ogtal.dk/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-medium text-gray-900 underline-offset-4 hover:text-blue-700 hover:underline"
+                className="text-gray-900 underline-offset-4 hover:text-blue-700 hover:underline"
               >
                 Analyse &amp; Tal
               </a>
@@ -91,7 +91,7 @@ export function Footer() {
                 href="https://slks.dk/omraader/folkeoplysning/europa-naevnet"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-medium text-gray-900 underline-offset-4 hover:text-blue-700 hover:underline"
+                className="text-gray-900 underline-offset-4 hover:text-blue-700 hover:underline"
               >
                 Europa-Nævnet
               </a>. Ansvar for indholdet er alene tilskudsmodtagers.
@@ -124,16 +124,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="mt-10 flex flex-col-reverse items-start justify-between gap-6 border-t border-gray-200 pt-6 sm:flex-row sm:items-center">
           <div className="flex flex-col gap-1 text-xs text-gray-500 sm:flex-row sm:items-center sm:gap-4">
-            <span>© {currentYear} EU-bureauet. Alle rettigheder forbeholdes.</span>
-            <span className="hidden sm:inline" aria-hidden="true">
-              ·
-            </span>
-            <a
-              href="https://www.eubureauet.dk/om-eu-bureauet/"
-              className="hover:text-blue-700 hover:underline"
-            >
-              Om EU-bureauet
-            </a>
+
           </div>
 
           <nav aria-label="Sociale medier">

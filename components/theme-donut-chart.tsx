@@ -474,23 +474,17 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
 
   return (
     <div>
+      <h3 className="text-base font-semibold text-gray-900 leading-snug">
+        Afstemninger i temaet
+      </h3>
       {meta.theme_description && (
-        <>
-          <p className="text-base font-semibold leading-snug text-gray-900">
-            {meta.theme_description}
-          </p>
-          <div
-            className="mt-2 h-[2px] w-16 rounded-full"
-            style={{ backgroundColor: rgbCss(baseRgb) }}
-          />
-        </>
+        <p className="mt-1.5 text-sm leading-relaxed text-gray-600">
+          {meta.theme_description}
+        </p>
       )}
 
       {layout.labels.length > 0 && arcGen && (
         <>
-          <h3 className="mt-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
-            Afstemninger i temaet
-          </h3>
           {(() => {
             if (width < 480) return null; // legend list below shows everything on mobile
             const hidden = layout.labels.filter((l) => !l.showLabel).length;
@@ -603,9 +597,9 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
                   always fit inside the inner circle. */}
               {(() => {
                 const innerR = layout.innerRadius ?? 60;
-                const documentsTotal = meta.documents_total ?? layout.labels.length;
-                const totalText = documentsTotal.toLocaleString("da-DK");
-                const unitLabel = documentsTotal === 1 ? "Sag" : "Sager";
+                const totalBallots = layout.labels.reduce((sum, slice) => sum + slice.voteCount, 0);
+                const totalText = totalBallots.toLocaleString("da-DK");
+                const unitLabel = totalBallots === 1 ? "Afstemning" : "Afstemninger";
                 // Available width inside the inner circle (with a little side padding).
                 const maxTextWidth = innerR * 2 * 0.82;
                 // Approx average glyph width ratio for a bold sans-serif numeral.
