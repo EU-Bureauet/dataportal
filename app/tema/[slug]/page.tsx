@@ -6,6 +6,7 @@ import { HeroSection } from "@/components/hero-section";
 import { ThemeArticles } from "@/components/theme-articles";
 import { VisualisationCard } from "@/components/visualisation-card";
 import { ThemeDonutChart, type ThemeVotesData } from "@/components/theme-donut-chart";
+import { ThemeVideoFab } from "@/components/theme-video-fab";
 
 interface ThemeArticleFilter {
   tags: string[];
@@ -30,6 +31,7 @@ interface ThemeData {
   title: string;
   subtitle?: string;
   heroImage: string;
+  videoUrl?: string;
   published?: boolean;
   articleFilter: ThemeArticleFilter;
   visualisations: ThemeVisualisation[];
@@ -259,6 +261,14 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
           </section>
         </div>
       </div>
+
+      {theme.videoUrl && (
+        <ThemeVideoFab
+          videoUrl={theme.videoUrl}
+          themeSlug={theme.slug}
+          title={theme.title}
+        />
+      )}
     </div>
   );
 }

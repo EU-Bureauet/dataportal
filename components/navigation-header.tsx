@@ -47,6 +47,7 @@ export function NavigationHeader() {
           {/* Logo - left */}
           <Link 
             href="/" 
+            prefetch={false}
             className="flex-shrink-0 hover:opacity-80 transition-opacity"
             title="Tilbage til forsiden"
           >

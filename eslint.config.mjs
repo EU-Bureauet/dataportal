@@ -61,6 +61,10 @@ const eslintConfig = [
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
 
+      // Security: forbid dangerouslySetInnerHTML by default; require an explicit
+      // per-line disable for sanctioned usages (e.g. injecting static CSS).
+      "react/no-danger": "error",
+
       // Relax some rules that are too strict for this codebase
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
       "@typescript-eslint/no-explicit-any": "warn",
