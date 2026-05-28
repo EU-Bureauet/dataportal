@@ -4,7 +4,6 @@ import React from 'react';
 import Link from 'next/link';
 import { Card } from "@/components/ui/card";
 import NewsCarousel from "@/components/news-carousel";
-import { ThemeExplorationCards } from "@/components/theme-exploration-cards";
 
 interface FeatureCard {
   title: string;
@@ -140,9 +139,6 @@ export default function LandingPage() {
           <p className="text-xl md:text-2xl text-gray-700 mb-4 max-w-3xl mx-auto">
             Få indsigt i hvordan Europa-Parlamentet stemmer
           </p>
-
-          {/* Theme exploration cards */}
-          <ThemeExplorationCards />
         </div>
       </div>
 

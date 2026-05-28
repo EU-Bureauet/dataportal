@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ArticleCard } from "./article-card";
 
 interface Article {
@@ -63,10 +63,10 @@ function mapPosts(posts: WPPost[]): Article[] {
 }
 
 export function ThemeArticles({ filter, initialVisible = 3 }: ThemeArticlesProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
 
   const tagIds = filter.tagIds ?? [];
-  const max = filter.maxArticles ?? 6;
+  const max = filter.maxArticles ?? 100;
   // Only build a request URL once we actually have tag IDs to filter by;
   // SWR treats a `null` key as a no-op, which safely short-circuits when
   // the theme JSON is missing tagIds (e.g. before the prebuild sync runs).
@@ -79,6 +79,10 @@ export function ThemeArticles({ filter, initialVisible = 3 }: ThemeArticlesProps
     revalidateOnFocus: false,
     shouldRetryOnError: false,
   });
+
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [url]);
 
   if (isLoading) {
     return (
@@ -111,9 +115,11 @@ export function ThemeArticles({ filter, initialVisible = 3 }: ThemeArticlesProps
     );
   }
 
-  const hasMore = articles.length > initialVisible;
-  const visible = expanded ? articles : articles.slice(0, initialVisible);
-  const hiddenCount = articles.length - initialVisible;
+  const pageSize = initialVisible;
+  const totalPages = Math.ceil(articles.length / pageSize);
+  const startIndex = currentPage * pageSize;
+  const visible = articles.slice(startIndex, startIndex + pageSize);
+  const hasPagination = totalPages > 1;
 
   return (
     <div className="space-y-6">
@@ -127,25 +133,38 @@ export function ThemeArticles({ filter, initialVisible = 3 }: ThemeArticlesProps
         />
       ))}
 
-      {hasMore && (
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg
-                     text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100
-                     transition-colors cursor-pointer"
-        >
-          {expanded ? (
-            <>
-              <ChevronUp className="w-4 h-4" />
-              Vis færre artikler
-            </>
-          ) : (
-            <>
-              <ChevronDown className="w-4 h-4" />
-              Vis {hiddenCount} flere artikler
-            </>
-          )}
-        </button>
+      {hasPagination && (
+        <div className="flex items-center justify-between gap-3 py-1">
+          <button
+            onClick={() => setCurrentPage((page) => Math.max(page - 1, 0))}
+            disabled={currentPage === 0}
+            className="inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg
+                       text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100
+                       disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-50
+                       transition-colors cursor-pointer"
+            aria-label="Forrige artikelside"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Forrige
+          </button>
+
+          <p className="text-sm text-gray-600" aria-live="polite">
+            Side {currentPage + 1} af {totalPages}
+          </p>
+
+          <button
+            onClick={() => setCurrentPage((page) => Math.min(page + 1, totalPages - 1))}
+            disabled={currentPage >= totalPages - 1}
+            className="inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg
+                       text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100
+                       disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-50
+                       transition-colors cursor-pointer"
+            aria-label="Næste artikelside"
+          >
+            Næste
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       )}
     </div>
   );

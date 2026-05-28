@@ -30,7 +30,13 @@ interface GroupWinsFile {
   [committee: string]: { total_group_wins: GroupWin[]; this_group_wins: GroupWin[] } | GroupWin[];
 }
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = async (url: string) => {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Kunne ikke hente ${url} (${response.status})`);
+  }
+  return response.json();
+};
 
 export function WinningCoalitionColumnChart({
   committee,
@@ -38,16 +44,37 @@ export function WinningCoalitionColumnChart({
 }: Readonly<{ committee?: string; themeLabel?: string }>) {
   const basePath = process.env.NEXT_PUBLIC_BASEPATH ? `/${process.env.NEXT_PUBLIC_BASEPATH}` : "";
 
-  const { data: winsData } = useSWR<GroupWinsFile>(`${basePath}/data/All_Group_wins.json`, fetcher);
-  const { data: tooltipsData } = useSWR<GroupTooltipsFile>(`${basePath}/data/group-tooltips.json`, fetcher);
-  const { data: namesData } = useSWR<GroupNamesFile>(`${basePath}/data/committee_and_group_names.json`, fetcher);
+  const { data: winsData, error: winsError } = useSWR<GroupWinsFile>(
+    `${basePath}/data/All_Group_wins.json`,
+    fetcher,
+    { shouldRetryOnError: false, revalidateOnFocus: false }
+  );
+  const { data: tooltipsData } = useSWR<GroupTooltipsFile>(
+    `${basePath}/data/group-tooltips.json`,
+    fetcher,
+    { shouldRetryOnError: false, revalidateOnFocus: false }
+  );
+  const { data: namesData, error: namesError } = useSWR<GroupNamesFile>(
+    `${basePath}/data/committee_and_group_names.json`,
+    fetcher,
+    { shouldRetryOnError: false, revalidateOnFocus: false }
+  );
 
   const [showTheme, setShowTheme] = useState(true);
   const [showAll, setShowAll] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<{ groupId: string; x: number; y: number } | null>(null);
 
-  if (!winsData || !tooltipsData || !namesData) {
+  const loadError = winsError ?? namesError;
+  if (loadError) {
+    return (
+      <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        Kunne ikke indlaese data til diagrammet. Tjek at datafilerne ligger under /dataportal/data/.
+      </div>
+    );
+  }
+
+  if (!winsData || !namesData) {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="w-6 h-6 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
@@ -56,7 +83,7 @@ export function WinningCoalitionColumnChart({
   }
 
   const descMap: Record<string, string> = {};
-  for (const g of tooltipsData.groups) if (g.description) descMap[g.code] = g.description;
+  for (const g of tooltipsData?.groups ?? []) if (g.description) descMap[g.code] = g.description;
   const nameMap = namesData.political_group_names;
 
   // Theme-specific data (foreground) — committee flat array
@@ -106,7 +133,7 @@ export function WinningCoalitionColumnChart({
       {hasTheme && (
         <div className="flex flex-wrap gap-3 mb-8">
           <ToggleButton active={showTheme} onToggle={() => setShowTheme((v) => !v)} label={themeName} activeColor="bg-blue-600" />
-          <ToggleButton active={showAll} onToggle={() => setShowAll((v) => !v)} label="Alle temaer" activeColor="bg-blue-600/60" />
+          <ToggleButton active={showAll} onToggle={() => setShowAll((v) => !v)} label="Alle afstemninger" activeColor="bg-blue-600/60" />
         </div>
       )}
 
@@ -186,7 +213,7 @@ export function WinningCoalitionColumnChart({
                         backgroundColor: color,
                         opacity: hasTheme ? 0.25 : 0.85,
                       }}
-                      title={`${groupId} alle temaer: ${allPct.toFixed(1)}% (${allEntry?.["Win Count"] ?? 0})`}
+                      title={`${groupId} alle afstemninger: ${allPct.toFixed(1)}% (${allEntry?.["Win Count"] ?? 0})`}
                     />
                   )}
                   {/* Foreground bar — theme-specific */}
@@ -225,8 +252,18 @@ export function WinningCoalitionColumnChart({
         const allEntry = allMap.get(tooltip.groupId);
         const themeEntry = themeMap.get(tooltip.groupId);
         const stats: { label: string; value: string }[] = [];
-        if (hasTheme && themeEntry) stats.push({ label: themeName, value: `${themeEntry["Win Percentage"].toFixed(1)}%` });
-        if (allEntry) stats.push({ label: "Alle temaer", value: `${allEntry["Win Percentage"].toFixed(1)}%` });
+        if (hasTheme && themeEntry) {
+          stats.push({
+            label: themeName,
+            value: `${themeEntry["Win Percentage"].toFixed(1)}% (${themeEntry["Win Count"]})`,
+          });
+        }
+        if (allEntry) {
+          stats.push({
+            label: "Alle afstemninger",
+            value: `${allEntry["Win Percentage"].toFixed(1)}% (${allEntry["Win Count"]})`,
+          });
+        }
         return (
           <GroupTooltip
             name={name}

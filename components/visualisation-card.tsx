@@ -13,12 +13,12 @@ interface VisualisationCardProps {
   title: string;
   description: string;
   href: string;
-  subDescription?: string;
+  ctaText?: string;
   /** Optional Tailwind gradient classes (e.g. "from-blue-600 to-blue-800") that override the title-based mapping. Used on theme pages so the hover top-line accent matches the theme color. */
   themeGradient?: string;
 }
 
-export function VisualisationCard({ title, description, href, subDescription, themeGradient }: VisualisationCardProps) {
+export function VisualisationCard({ title, description, href, ctaText, themeGradient }: VisualisationCardProps) {
   const gradient = themeGradient ?? GRADIENT_MAP[title] ?? DEFAULT_GRADIENT;
 
   return (
@@ -39,15 +39,9 @@ export function VisualisationCard({ title, description, href, subDescription, th
           {description}
         </p>
 
-        {subDescription && (
-          <p className="mt-2.5 text-xs text-gray-400 leading-relaxed line-clamp-2 border-l-2 border-gray-200 pl-2.5 group-hover:border-blue-300 transition-colors duration-200">
-            {subDescription}
-          </p>
-        )}
-
         {/* CTA with animated arrow */}
         <span className="mt-3.5 inline-flex items-center gap-1 text-sm font-medium text-blue-600 group-hover:text-blue-700 transition-colors duration-200">
-          Se visualisering
+          {ctaText ?? "Se visualisering"}
           <svg
             className="w-4 h-4 transition-transform duration-300 ease-out group-hover:translate-x-1"
             fill="none"

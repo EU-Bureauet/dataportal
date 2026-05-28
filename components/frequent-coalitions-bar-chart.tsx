@@ -33,35 +33,61 @@ interface WinningCoalitionsFile {
     | WinningCoalition[];
 }
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = async (url: string) => {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Kunne ikke hente ${url} (${response.status})`);
+  }
+  return response.json();
+};
 
 const MAX_ROWS = 10;
 
+// eslint-disable-next-line complexity -- component combines multiple data/loading/toggle states in one chart renderer
 export function FrequentCoalitionsBarChart({
   committee,
   themeLabel,
 }: Readonly<{ committee?: string; themeLabel?: string }>) {
   const basePath = process.env.NEXT_PUBLIC_BASEPATH ? `/${process.env.NEXT_PUBLIC_BASEPATH}` : "";
 
-  const { data: coalData } = useSWR<WinningCoalitionsFile>(
+  const { data: coalData, error: coalError } = useSWR<WinningCoalitionsFile>(
     `${basePath}/data/All_Winning_coalitions.json`,
-    fetcher
+    fetcher,
+    { shouldRetryOnError: false, revalidateOnFocus: false }
   );
   const { data: tooltipsData } = useSWR<GroupTooltipsFile>(
     `${basePath}/data/group-tooltips.json`,
-    fetcher
+    fetcher,
+    { shouldRetryOnError: false, revalidateOnFocus: false }
   );
-  const { data: namesData } = useSWR<GroupNamesFile>(
+  const { data: namesData, error: namesError } = useSWR<GroupNamesFile>(
     `${basePath}/data/committee_and_group_names.json`,
-    fetcher
+    fetcher,
+    { shouldRetryOnError: false, revalidateOnFocus: false }
   );
 
   const [showTheme, setShowTheme] = useState(true);
   const [showAll, setShowAll] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [tooltip, setTooltip] = useState<{ groupCode: string; x: number; y: number } | null>(null);
+  const [groupTooltip, setGroupTooltip] = useState<{ groupCode: string; x: number; y: number } | null>(null);
+  const [coalitionTooltip, setCoalitionTooltip] = useState<{
+    coalitionCode: string;
+    coalitionName: string;
+    stats: { label: string; value: string }[];
+    x: number;
+    y: number;
+  } | null>(null);
 
-  if (!coalData || !tooltipsData || !namesData) {
+  const loadError = coalError ?? namesError;
+  if (loadError) {
+    return (
+      <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        Kunne ikke indlaese data til diagrammet. Tjek at datafilerne ligger under /dataportal/data/.
+      </div>
+    );
+  }
+
+  if (!coalData || !namesData) {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="w-6 h-6 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
@@ -70,7 +96,7 @@ export function FrequentCoalitionsBarChart({
   }
 
   const descMap: Record<string, string> = {};
-  for (const g of tooltipsData.groups) if (g.description) descMap[g.code] = g.description;
+  for (const g of tooltipsData?.groups ?? []) if (g.description) descMap[g.code] = g.description;
   const nameMap = namesData.political_group_names;
 
   // Theme-specific data (foreground) — committee flat array
@@ -125,7 +151,7 @@ export function FrequentCoalitionsBarChart({
       {hasTheme && (
         <div className="flex flex-wrap gap-3 mb-8">
           <ToggleButton active={showTheme} onToggle={() => setShowTheme((v) => !v)} label={themeName} activeColor="bg-blue-600" />
-          <ToggleButton active={showAll} onToggle={() => setShowAll((v) => !v)} label="Alle temaer" activeColor="bg-blue-600/60" />
+          <ToggleButton active={showAll} onToggle={() => setShowAll((v) => !v)} label="Alle afstemninger" activeColor="bg-blue-600/60" />
         </div>
       )}
 
@@ -176,9 +202,10 @@ export function FrequentCoalitionsBarChart({
                         const rect = containerRef.current?.getBoundingClientRect();
                         if (!rect) return;
                         const el = e.currentTarget.getBoundingClientRect();
-                        setTooltip({ groupCode: code, x: el.left + el.width / 2 - rect.left, y: el.top - rect.top });
+                        setCoalitionTooltip(null);
+                        setGroupTooltip({ groupCode: code, x: el.left + el.width / 2 - rect.left, y: el.top - rect.top });
                       }}
-                      onMouseLeave={() => setTooltip(null)}
+                      onMouseLeave={() => setGroupTooltip(null)}
                     >
                       {code}
                     </span>
@@ -186,7 +213,38 @@ export function FrequentCoalitionsBarChart({
                 </div>
                 {/* Bar */}
                 <div className="flex items-center gap-2 flex-1">
-                  <div className="flex-1 relative h-7">
+                  <div
+                    className="flex-1 relative h-7"
+                    onMouseEnter={(e) => {
+                      const rect = containerRef.current?.getBoundingClientRect();
+                      if (!rect) return;
+                      const el = e.currentTarget.getBoundingClientRect();
+                      const coalitionCode = c["Winning Coalition"].join(" + ");
+                      const coalitionName = c["Winning Coalition"].map((code) => nameMap[code] ?? code).join(" + ");
+                      const stats: { label: string; value: string }[] = [];
+                      if (hasTheme && themeEntry) {
+                        stats.push({
+                          label: themeName,
+                          value: `${themePct.toFixed(1)}% (${themeEntry.Count})`,
+                        });
+                      }
+                      if (allEntry) {
+                        stats.push({
+                          label: "Alle afstemninger",
+                          value: `${allPct.toFixed(1)}% (${allEntry.Count})`,
+                        });
+                      }
+                      setGroupTooltip(null);
+                      setCoalitionTooltip({
+                        coalitionCode,
+                        coalitionName,
+                        stats,
+                        x: el.left + el.width / 2 - rect.left,
+                        y: el.top - rect.top,
+                      });
+                    }}
+                    onMouseLeave={() => setCoalitionTooltip(null)}
+                  >
                     {/* Shadow bar — alle temaer */}
                     {showAll && (
                       <div
@@ -198,7 +256,6 @@ export function FrequentCoalitionsBarChart({
                           height: hasTheme ? "20px" : "22px",
                           opacity: hasTheme ? 0.3 : 0.7,
                         }}
-                        title={`Alle temaer: ${allPct.toFixed(1)}%`}
                       />
                     )}
                     {/* Foreground bar — theme-specific */}
@@ -206,7 +263,6 @@ export function FrequentCoalitionsBarChart({
                       <div
                         className="absolute rounded-r-sm bg-blue-600 transition-all duration-700 ease-in-out"
                         style={{ width: `${themeWidth}%`, top: "0", height: "20px" }}
-                        title={`${themeName}: ${themePct.toFixed(1)}%`}
                       />
                     )}
                   </div>
@@ -243,8 +299,8 @@ export function FrequentCoalitionsBarChart({
       <p className="text-xs text-gray-400 mt-6">
         Koalitionskombinationer sorteret efter hyppighed
       </p>
-      {tooltip && (() => {
-        const code = tooltip.groupCode;
+      {groupTooltip && (() => {
+        const code = groupTooltip.groupCode;
         const name = nameMap[code] ?? code;
         const desc = descMap[code];
         return (
@@ -253,12 +309,23 @@ export function FrequentCoalitionsBarChart({
             code={code}
             color={GROUP_COLORS[code] ?? "#888"}
             description={desc}
-            x={tooltip.x}
-            y={tooltip.y}
+            x={groupTooltip.x}
+            y={groupTooltip.y}
             containerWidth={containerRef.current?.clientWidth ?? 400}
           />
         );
       })()}
+      {coalitionTooltip && (
+        <GroupTooltip
+          name={coalitionTooltip.coalitionName}
+          code={coalitionTooltip.coalitionCode}
+          color="#2563eb"
+          stats={coalitionTooltip.stats}
+          x={coalitionTooltip.x}
+          y={coalitionTooltip.y}
+            containerWidth={containerRef.current?.clientWidth ?? 400}
+          />
+      )}
     </div>
   );
 }
