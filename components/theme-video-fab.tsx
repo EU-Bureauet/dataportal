@@ -124,7 +124,7 @@ export function ThemeVideoFab({ videoUrl, themeSlug, title }: ThemeVideoFabProps
           type="button"
           onClick={handleDismiss}
           aria-label="Skjul introvideo"
-          className="fab-dismiss absolute -top-1 -right-1 w-6 h-6 rounded-full bg-black/80 hover:bg-black text-white border-2 border-white flex items-center justify-center shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-transform hover:scale-110"
+          className="fab-dismiss absolute top-[2px] right-[2px] w-6 h-6 rounded-full bg-black/80 hover:bg-black text-white border-2 border-white flex items-center justify-center shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-transform hover:scale-110"
         >
           <svg
             width="8"
