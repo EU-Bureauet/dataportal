@@ -103,12 +103,17 @@ export function ThemeVideoFab({ videoUrl, themeSlug, title }: ThemeVideoFabProps
           <video
             ref={bgVideoRef}
             src={resolvedUrl}
-            className="absolute inset-0 w-full h-full object-cover rounded-full"
+            className="absolute inset-0 w-full h-full object-cover rounded-full pointer-events-none"
             muted
             loop
             autoPlay
             playsInline
+            disablePictureInPicture
+            controlsList="nodownload noremoteplayback"
             preload="metadata"
+            aria-hidden="true"
+            tabIndex={-1}
+            draggable={false}
           >
             <track kind="captions" />
           </video>
