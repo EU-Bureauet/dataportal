@@ -32,6 +32,12 @@ function stripHTML(html: string): string {
 }
 
 function decodeHTML(html: string): string {
+  if (typeof document !== 'undefined') {
+    const el = document.createElement('textarea');
+    el.innerHTML = html;
+    return el.value;
+  }
+
   const entities: { [key: string]: string } = {
     '&amp;': '&',
     '&lt;': '<',
@@ -41,8 +47,18 @@ function decodeHTML(html: string): string {
     '&apos;': "'",
     '&nbsp;': ' ',
   };
-  
-  return html.replace(/&[#a-z0-9]+;/gi, (entity) => {
+
+  return html.replace(/&#x([\da-f]+);|&#(\d+);|&[a-z0-9]+;/gi, (entity, hex, dec) => {
+    if (hex) {
+      const codePoint = Number.parseInt(hex, 16);
+      return Number.isNaN(codePoint) ? entity : String.fromCodePoint(codePoint);
+    }
+
+    if (dec) {
+      const codePoint = Number.parseInt(dec, 10);
+      return Number.isNaN(codePoint) ? entity : String.fromCodePoint(codePoint);
+    }
+
     return entities[entity.toLowerCase()] || entity;
   });
 }
