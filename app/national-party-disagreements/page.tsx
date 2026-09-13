@@ -1,27 +1,21 @@
 "use client"
 
-import React from 'react';
-import { NationalPartyDisagreementsView } from "@/components/national-party-disagreements-view";
-import { NationalPartyDisagreementsData } from "@/types/data";
 import useSWR from "swr";
+import { NationalPartyDisagreementsView } from "@/components/national-party-disagreements-view";
+import type { NPDIndex } from "@/types/national-party-disagreements";
+
+const fetcher = (url: string) =>
+  fetch(url).then((response) => {
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  });
 
 export default function NationalPartyDisagreementsPage() {
-  const fetcher = (url: string) => {
-    return fetch(url).then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    });
-  };
-
-  // Fetch national party disagreements data
-  const basePath = process.env.NEXT_PUBLIC_BASEPATH || 'dataportal';
-  const url = `/${basePath}/data/national_party_disagreements.json`;
-  const { data, error, isLoading } = useSWR<NationalPartyDisagreementsData>(
-    url,
-    fetcher
-  );
+  const basePath = process.env.NEXT_PUBLIC_BASEPATH || "dataportal";
+  const url = `/${basePath}/data/National_Party_Disagreements.json`;
+  const { data, error, isLoading } = useSWR<NPDIndex>(url, fetcher);
 
   if (isLoading) {
     return (

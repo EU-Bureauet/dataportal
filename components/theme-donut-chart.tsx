@@ -485,16 +485,6 @@ export function ThemeDonutChart({ data, accentColor = "#1d4ed8", latestVotesSear
 
       {layout.labels.length > 0 && arcGen && (
         <>
-          {(() => {
-            if (width < 480) return null; // legend list below shows everything on mobile
-            const hidden = layout.labels.filter((l) => !l.showLabel).length;
-            if (hidden === 0) return null;
-            return (
-              <p className="mt-1 text-[0.7rem] text-gray-400">
-                {hidden} mindre afstemning{hidden === 1 ? "" : "er"} vises uden navn — hold musen over en bid for at se den.
-              </p>
-            );
-          })()}
           <div
             ref={containerRef}
             className="mt-1 w-full relative"

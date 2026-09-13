@@ -3,6 +3,9 @@
 import { useState, Fragment } from 'react';
 import Link from 'next/link';
 import { EUBureauetLogo } from './eu-bureauet-logo.tsx';
+import forsvarTheme from '@/data/themes/forsvar.json';
+import miljoeTheme from '@/data/themes/miljoe.json';
+import energiTheme from '@/data/themes/energi.json';
 
 const navigationLinks = [
   { href: '/', label: 'Dataportal' },
@@ -17,6 +20,12 @@ const navigationLinks = [
   { href: '/winning-coalitions', label: 'Vindende koalitioner' },
   { href: '/national-party-disagreements', label: 'Partiuenigheder' },
 ];
+
+const themeLinks = [forsvarTheme, miljoeTheme, energiTheme]
+  .filter((theme) => theme.published === true)
+  .map((theme) => ({ href: `/tema/${theme.slug}`, label: `Tema: ${theme.title}` }));
+
+const menuLinks = [...navigationLinks, ...themeLinks];
 
 export function NavigationHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -71,7 +80,7 @@ export function NavigationHeader() {
             aria-hidden={!isMenuOpen}
           >
             <ul className="py-2">
-              {navigationLinks.map((link) => (
+              {menuLinks.map((link) => (
                 <Fragment key={link.href}>
                   <li>
                     <Link

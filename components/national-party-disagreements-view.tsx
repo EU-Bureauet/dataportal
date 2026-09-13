@@ -1,250 +1,165 @@
 "use client"
 
-import React, { useState, useMemo } from 'react';
+import { useMemo, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { NationalPartyDisagreementsData, extractCountryFromPartyName } from "@/types/data";
-import { GROUP_COLORS } from "@/lib/group-colors";
-import { PartyDetailView } from "@/components/national-party-disagreements-sections";
+import { DisagreementBar, FlagIcon, GroupBadge } from "@/components/national-party-disagreements-shared";
+import { PartyDetail } from "@/components/national-party-disagreements-detail";
+import { npdPartyKey, type NPDIndex, type NPDPartySummary } from "@/types/national-party-disagreements";
+
+const ALL = "__all__";
 
 interface NationalPartyDisagreementsViewProps {
-  data: NationalPartyDisagreementsData;
+  data: NPDIndex;
 }
 
 export function NationalPartyDisagreementsView({ data }: NationalPartyDisagreementsViewProps) {
-  const [selectedCountry, setSelectedCountry] = useState<string>("all");
-  const [selectedParty, setSelectedParty] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [expandedVote, setExpandedVote] = useState<string | null>(null);
+  const basePath = process.env.NEXT_PUBLIC_BASEPATH ? `/${process.env.NEXT_PUBLIC_BASEPATH}` : "";
 
-  // Extract all unique countries
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState(ALL);
+  const [selectedGroup, setSelectedGroup] = useState(ALL);
+  const [expandedParty, setExpandedParty] = useState<string | null>(null);
+
   const countries = useMemo(() => {
-    const countrySet = new Set<string>();
-    Object.keys(data.parties).forEach(partyName => {
-      const { country } = extractCountryFromPartyName(partyName);
-      if (country) {
-        countrySet.add(country);
-      }
-    });
-    return ["all", ...Array.from(countrySet).sort()];
+    const set = new Map<string, string>(); // country_code -> country name
+    for (const p of data.parties) set.set(p.country_code, p.country);
+    return Array.from(set.entries()).sort((a, b) => a[1].localeCompare(b[1], "da"));
   }, [data]);
 
-  // Transform parties data with country extraction
-  const partiesWithCountry = useMemo(() => {
-    return Object.entries(data.parties).map(([fullPartyName, partyData]) => {
-      const { partyNameWithoutCountry, country } = extractCountryFromPartyName(fullPartyName);
-      return {
-        fullPartyName,
-        partyName: partyNameWithoutCountry,
-        country,
-        data: partyData
-      };
-    });
+  const groups = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of data.parties) for (const g of p.political_groups) set.add(g);
+    return Array.from(set).sort();
   }, [data]);
 
-  // Filter parties by selected country and search term
   const filteredParties = useMemo(() => {
-    let filtered = partiesWithCountry;
+    const term = searchTerm.trim().toLowerCase();
+    let list = data.parties;
 
-    if (selectedCountry !== "all") {
-      filtered = filtered.filter(p => p.country === selectedCountry);
-    }
-
-    if (searchTerm) {
-      filtered = filtered.filter(p =>
-        p.partyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.country.toLowerCase().includes(searchTerm.toLowerCase())
+    if (selectedCountry !== ALL) list = list.filter((p) => p.country_code === selectedCountry);
+    if (selectedGroup !== ALL) list = list.filter((p) => p.political_groups.includes(selectedGroup));
+    if (term) {
+      list = list.filter(
+        (p) => p.national_party.toLowerCase().includes(term) || p.country.toLowerCase().includes(term)
       );
     }
 
-    return filtered.sort((a, b) =>
-      b.data.disagreement_statistics.disagreement_rate_percent -
-      a.data.disagreement_statistics.disagreement_rate_percent
-    );
-  }, [partiesWithCountry, selectedCountry, searchTerm]);
-
-  // Get selected party data
-  const selectedPartyData = useMemo(() => {
-    if (!selectedParty) return null;
-    return filteredParties.find(p => p.fullPartyName === selectedParty);
-  }, [selectedParty, filteredParties]);
-
-  // Helper function to get color for a political group
-  const getGroupColor = (groupName: string): string => {
-    // Try direct match first
-    if (GROUP_COLORS[groupName]) return GROUP_COLORS[groupName];
-
-    // Try partial matches
-    if (groupName.includes("People's Party") || groupName.includes("PPE")) return GROUP_COLORS["PPE"];
-    if (groupName.includes("Socialists") || groupName.includes("S&D")) return GROUP_COLORS["S&D"];
-    if (groupName.includes("Renew")) return GROUP_COLORS["Renew"];
-    if (groupName.includes("Greens") || groupName.includes("Verts")) return GROUP_COLORS["Verts/ALE"];
-    if (groupName.includes("Conservatives") || groupName.includes("ECR")) return GROUP_COLORS["ECR"];
-    if (groupName.includes("Left") || groupName.includes("GUE")) return GROUP_COLORS["The Left"];
-    if (groupName.includes("Sovereign") || groupName.includes("ESN")) return GROUP_COLORS["ESN"];
-    if (groupName.includes("Patriots") || groupName.includes("PfE")) return GROUP_COLORS["PfE"];
-
-    return GROUP_COLORS["NI"];
-  };
+    return [...list].sort((a, b) => b.disagreement_rate_percent - a.disagreement_rate_percent);
+  }, [data, searchTerm, selectedCountry, selectedGroup]);
 
   return (
-    <div className="space-y-6">
-      {/* Overview Section */}
-      {!selectedParty && (
-        <>
-          {/* Metadata Card */}
-          <Card className="p-6 bg-blue-50">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <div className="text-sm text-gray-600 mb-1">Partier analyseret</div>
-                <div className="text-2xl font-bold text-blue-900">
-                  {data.metadata.total_parties_analyzed}
-                </div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600 mb-1">Afstemninger i datasæt</div>
-                <div className="text-2xl font-bold text-blue-900">
-                  {data.metadata.total_votes_in_dataset}
-                </div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600 mb-1">Data genereret</div>
-                <div className="text-lg font-semibold text-blue-900">
-                  {data.metadata.generated}
-                </div>
-              </div>
-            </div>
-          </Card>
+    <div className="space-y-4">
+      {/* Filters */}
+      <Card className="p-4">
+        <div className="flex flex-col md:flex-row gap-3">
+          <input
+            type="text"
+            placeholder="Søg efter parti eller land..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <select
+            value={selectedCountry}
+            onChange={(e) => setSelectedCountry(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value={ALL}>Alle lande</option>
+            {countries.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+          </select>
+          <select
+            value={selectedGroup}
+            onChange={(e) => setSelectedGroup(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value={ALL}>Alle grupper</option>
+            {groups.map((g) => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
 
-          {/* Filters */}
-          <Card className="p-6">
-            <div className="space-y-4">
-              {/* Country Filter */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Filtrer på land:</label>
-                <div className="flex flex-wrap gap-2">
-                  {countries.map(country => (
-                    <button
-                      key={country}
-                      onClick={() => setSelectedCountry(country)}
-                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                        selectedCountry === country
-                          ? "bg-blue-600 text-white"
-                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                      }`}
-                    >
-                      {country === "all" ? "Alle lande" : country}
-                    </button>
-                  ))}
-                </div>
-              </div>
+        <div className="flex items-center mt-3">
+          <span className="text-sm text-gray-400 ml-auto">Viser {filteredParties.length} partier</span>
+        </div>
+      </Card>
 
-              {/* Search */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Søg efter parti:</label>
-                <input
-                  type="text"
-                  placeholder="Søg efter partinavn..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+      {/* Party list */}
+      <div className="space-y-2">
+        {filteredParties.map((party) => (
+          <PartyRow
+            key={npdPartyKey(party)}
+            party={party}
+            basePath={basePath}
+            isExpanded={expandedParty === npdPartyKey(party)}
+            onToggle={() =>
+              setExpandedParty((prev) => (prev === npdPartyKey(party) ? null : npdPartyKey(party)))
+            }
+          />
+        ))}
+      </div>
 
-              <div className="text-sm text-gray-600">
-                Viser {filteredParties.length} partier
-              </div>
-            </div>
-          </Card>
-
-          {/* Party Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredParties.map((party) => (
-              <Card
-                key={party.fullPartyName}
-                className="p-6 hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => setSelectedParty(party.fullPartyName)}
-              >
-                <div className="mb-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="text-lg font-bold flex-1">{party.partyName}</h3>
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                      {party.country}
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-600">
-                    {party.data.party_info.total_meps} medlemmer
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-3 border-t">
-                  <div>
-                    <div className="text-2xl font-bold text-red-600">
-                      {party.data.disagreement_statistics.disagreement_rate_percent.toFixed(1)}%
-                    </div>
-                    <div className="text-xs text-gray-600">Uenighedsprocent</div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <div className="font-semibold text-gray-900">
-                        {party.data.disagreement_statistics.total_disagreements}
-                      </div>
-                      <div className="text-xs text-gray-600">Uenigheder</div>
-                    </div>
-                    <div>
-                      <div className="font-semibold text-gray-900">
-                        {party.data.disagreement_statistics.total_votes_analyzed}
-                      </div>
-                      <div className="text-xs text-gray-600">Afstemninger</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* MEPs preview */}
-                <div className="mt-4 pt-3 border-t">
-                  <div className="text-xs text-gray-600 mb-2">Medlemmer:</div>
-                  <div className="flex flex-wrap gap-1">
-                    {party.data.party_info.meps.slice(0, 3).map((mep) => {
-                      const groupColor = getGroupColor(mep.political_group);
-                      return (
-                        <div
-                          key={mep.mep_id}
-                          className="w-5 h-5 rounded-full border-2 border-white shadow-sm"
-                          style={{ backgroundColor: groupColor }}
-                          title={`${mep.name} - ${mep.political_group}`}
-                        />
-                      );
-                    })}
-                    {party.data.party_info.meps.length > 3 && (
-                      <div className="w-5 h-5 rounded-full bg-gray-300 text-[10px] flex items-center justify-center text-gray-700 font-semibold">
-                        +{party.data.party_info.meps.length - 3}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* Detailed View for Selected Party */}
-      {selectedParty && selectedPartyData && (
-        <PartyDetailView
-          partyData={selectedPartyData}
-          expandedVote={expandedVote}
-          setExpandedVote={setExpandedVote}
-          onBack={() => {
-            setSelectedParty(null);
-            setExpandedVote(null);
-          }}
-        />
-      )}
-
-      {filteredParties.length === 0 && !selectedParty && (
+      {filteredParties.length === 0 && (
         <Card className="p-6">
           <p className="text-gray-600 text-center">Ingen partier fundet med de valgte filtre</p>
         </Card>
+      )}
+
+      {/* Metadata */}
+      <p className="text-sm text-gray-500">
+        {data.metadata.total_parties_analyzed} partier · {data.metadata.total_votes_in_dataset.toLocaleString("da-DK")} afstemninger i alt · genereret {data.metadata.generated}
+      </p>
+    </div>
+  );
+}
+
+function PartyRow({
+  party,
+  basePath,
+  isExpanded,
+  onToggle,
+}: Readonly<{
+  party: NPDPartySummary;
+  basePath: string;
+  isExpanded: boolean;
+  onToggle: () => void;
+}>) {
+  return (
+    <div
+      className={`bg-white rounded-xl border transition-all ${
+        isExpanded ? "border-blue-300 shadow-md" : "border-gray-200 hover:border-blue-300 hover:shadow-sm"
+      }`}
+    >
+      <button onClick={onToggle} className="w-full text-left p-4 cursor-pointer">
+        <div className="flex items-start gap-3">
+          <FlagIcon
+            countryCode={party.country_code}
+            title={party.country}
+            className="w-6 h-auto rounded-sm flex-shrink-0 mt-0.5"
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-baseline gap-2 min-w-0 flex-wrap">
+                <h3 className="font-semibold text-gray-900">{party.national_party}</h3>
+                {party.political_groups.map((g) => <GroupBadge key={g} code={g} />)}
+              </div>
+              <span className="text-gray-400 flex-shrink-0">
+                {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {party.meps.length} medlemmer · {party.disagreement_count.toLocaleString("da-DK")} uenigheder ud af {party.total_votes_with_participation.toLocaleString("da-DK")} afstemninger
+            </p>
+            <div className="mt-2">
+              <DisagreementBar ratePercent={party.disagreement_rate_percent} />
+            </div>
+          </div>
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="px-4 pb-4 pt-0 border-t border-gray-100">
+          <PartyDetail party={party} basePath={basePath} />
+        </div>
       )}
     </div>
   );

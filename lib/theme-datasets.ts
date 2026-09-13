@@ -11,6 +11,8 @@
 export interface ThemeDatasetEntry {
   /** File name in /public/data/ (or copied data/ folder). */
   file: string;
+  /** File containing only the theme's vote IDs. */
+  voteIdsFile: string;
   /** Human-readable theme label (Danish). */
   label: string;
 }
@@ -18,14 +20,17 @@ export interface ThemeDatasetEntry {
 export const THEME_DATASETS: Record<string, ThemeDatasetEntry> = {
   "forsvar|forsvarspolitik": {
     file: "theme_votes_forsvar_sikkerhed.json",
+    voteIdsFile: "theme_vote_ids_forsvar_sikkerhed.json",
     label: "Forsvar og sikkerhed",
   },
   "milj\u00f8|milj\u00f8politik": {
     file: "theme_votes_miljo_sundhed.json",
+    voteIdsFile: "theme_vote_ids_miljo_sundhed.json",
     label: "Milj\u00f8 og sundhed",
   },
   "energi|energipolitik": {
     file: "theme_votes_energi_industri.json",
+    voteIdsFile: "theme_vote_ids_energi_industri.json",
     label: "Energi og industri",
   },
 };

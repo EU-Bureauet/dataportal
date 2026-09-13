@@ -6,101 +6,27 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { GROUP_COLORS } from "@/lib/group-colors";
 import { matchThemeDataset } from "@/lib/theme-datasets";
+import { toDanishMepLocalPhotoUrl } from "@/lib/photo-utils";
+import {
+  buildGroupVoteMaps,
+  buildMepSummaries,
+  buildSearchRegex,
+  buildTopicVoteIds,
+  buildVoteMetaMap,
+  buildVoteTopicMap,
+  GROUP_CODES,
+  GROUP_FILE_BY_CODE,
+} from "@/lib/danish-mep-votes-helpers";
+import type {
+  AllyCount,
+  Disagreement,
+  IndexedVotesDoc,
+  LatestVotesDoc,
+  MEPClean,
+  MEPSummary,
+  ThemeVoteIdsDoc,
+} from "@/lib/danish-mep-votes-helpers";
 import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
-
-// ─── Local photo helper ──────────────────────────────────────────────────────
-
-const PHOTO_DIR = "/img/Danish_MEPs";
-
-/** Map full_name (e.g. "Morten LØKKEGAARD") → local filename (e.g. "Morten Loekkegaard") */
-function toLocalPhotoUrl(fullName: string, basePath: string): string {
-  // Convert "Given SURNAME" → "Given Surname" (title case)
-  const normalised = fullName
-    .split(" ")
-    .map((part) => {
-      // Handle hyphenated names like PETER-HANSEN → Peter-Hansen
-      return part
-        .split("-")
-        .map((seg) => seg.charAt(0).toUpperCase() + seg.slice(1).toLowerCase())
-        .join("-");
-    })
-    .join(" ");
-
-  // Replace Danish special chars with the ASCII variants used in the filenames
-  const ascii = normalised
-    .replace(/Ø/g, "Oe")
-    .replace(/ø/g, "oe")
-    .replace(/Æ/g, "Ae")
-    .replace(/æ/g, "ae")
-    .replace(/Å/g, "Aa")
-    .replace(/å/g, "aa");
-
-  return `${basePath}${PHOTO_DIR}/${encodeURIComponent(ascii)}.jpg`;
-}
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface MEPClean {
-  mep_id: string;
-  full_name: string;
-  family_name: string;
-  given_name: string;
-  photo_url: string;
-  country_code: string;
-  national_party_id: { name: string; code: string };
-  current_group_id?: { name: string; code: string };
-  n_votes: number;
-  n_votes_with_group: number;
-  n_votes_against_group: number;
-  group_loyalty: number;
-  participation_pct: number;
-}
-
-interface Disagreement {
-  "Vote ID": string;
-  "Vote Description": string;
-  "Document Title": string;
-  "Short Title": string;
-  "Document Link": string;
-  "MEP Name": string;
-  "Vote Type": string;
-  "Vote Type_Majority": string;
-  "Group ID": string;
-  "Group Majority Percentage": number;
-  ECR: string;
-  ESN: string;
-  NI: string;
-  PPE: string;
-  PfE: string;
-  Renew: string;
-  "S&D": string;
-  "The Left": string;
-  "Verts/ALE": string;
-}
-
-interface LatestVotesDoc {
-  short_title: string;
-  eurovoc_keywords: string[];
-  votes: { vote_id: number; vote_description: string }[];
-}
-
-interface AllyCount {
-  group: string;
-  count: number;
-  pct: number;
-}
-
-interface MEPSummary {
-  mep: MEPClean;
-  totalDisagreements: number;
-  filteredDisagreements: Disagreement[];
-  topAllies: AllyCount[];
-  topicVoteCount: number;
-}
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const GROUP_CODES = ["ECR", "ESN", "NI", "PPE", "PfE", "Renew", "S&D", "The Left", "Verts/ALE"] as const;
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -108,8 +34,8 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 // Change these strings to update text across the entire component.
 
 const LABELS = {
-  /** Accordion header when expanded: {name} is replaced with the MEP's family name */
-  accordionHeader: "↓ Brud med gruppen — hvem stemte {name} med?",
+  /** Accordion header when expanded: {count}, {name} and {group} are replaced dynamically */
+  accordionHeader: "De {count} gange {name} har brudt med flertallet i {group}, er det oftest på linje med...",
   /** Detail panel: how many breaks */
   breakCount: "{count} brud med partigruppen",
   /** Detail panel: ally chart heading */
@@ -351,7 +277,7 @@ function MEPDetailPanel({
       <div className="flex items-center gap-4 mb-6">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={toLocalPhotoUrl(summary.mep.full_name, basePath)}
+          src={toDanishMepLocalPhotoUrl(summary.mep.full_name, basePath)}
           alt={summary.mep.full_name}
           className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 flex-shrink-0"
           onError={(e) => {
@@ -410,22 +336,69 @@ export function DanishMEPVotesChart() {
 
   const basePath = process.env.NEXT_PUBLIC_BASEPATH ? `/${process.env.NEXT_PUBLIC_BASEPATH}` : "";
 
-  // When the URL carries a recognised (search, eurovoc) theme combo we swap
-  // the global `latest_votes.json` for the curated theme dataset so this page
-  // is consistent with /tema/* and /latest-votes (same set of votes).
+  // When the URL carries a recognised (search, eurovoc) theme combo, we use
+  // the dedicated vote-id file for fast and deterministic theme filtering.
+  // Non-theme keyword filtering still uses `latest_votes.json`.
   const themeDataset = matchThemeDataset(searchFilter, eurovocFilter);
-  const votesUrl = themeDataset
-    ? `${basePath}/data/${themeDataset.file}`
-    : `${basePath}/data/latest_votes.json`;
+  const hasTopicFilter = !!(searchFilter || eurovocFilter);
+  const themeVoteIdsUrl = themeDataset
+    ? `${basePath}/data/${themeDataset.voteIdsFile}`
+    : null;
 
   const { data: mepData } = useSWR<{ meps: MEPClean[] }>(`${basePath}/data/meps_clean.json`, fetcher);
-  const { data: brudData } = useSWR<{ mep_vs_party: { disagreements: Disagreement[] } }>(
-    `${basePath}/data/Danske_MEPs_brud_med_partigruppelinjen.json`,
+  const { data: latestVotes } = useSWR<{ documents: LatestVotesDoc[] }>(
+    `${basePath}/data/latest_votes.json`,
     fetcher
   );
-  const { data: latestVotes } = useSWR<{ documents: LatestVotesDoc[] }>(
-    votesUrl,
+  const { data: themeVoteIdsData } = useSWR<ThemeVoteIdsDoc>(
+    themeVoteIdsUrl,
     fetcher
+  );
+  const danishMepIds = useMemo(() => {
+    if (!mepData) return [] as string[];
+    return mepData.meps
+      .filter((m) => m.country_code.includes("DNK") && m.current_group_id)
+      .map((m) => m.mep_id);
+  }, [mepData]);
+
+  const { data: mepIndexedVotesById } = useSWR<Record<string, IndexedVotesDoc>>(
+    danishMepIds.length > 0
+      ? `${basePath}|mep-indexed|${danishMepIds.join(",")}`
+      : null,
+    async () => {
+      const entries = await Promise.all(
+        danishMepIds.map(async (mepId) => {
+          const response = await fetch(`${basePath}/data/mep_${mepId}.json`);
+          if (!response.ok) {
+            return [mepId, { vote_ids: [], votes: [] }] as const;
+          }
+          const data = (await response.json()) as IndexedVotesDoc;
+          return [mepId, data] as const;
+        })
+      );
+      return Object.fromEntries(entries);
+    }
+  );
+
+  const { data: groupIndexedVotesByCode } = useSWR<Record<string, IndexedVotesDoc>>(
+    `${basePath}|group-indexed`,
+    async () => {
+      const entries = await Promise.all(
+        GROUP_CODES.map(async (groupCode) => {
+          const fileName = GROUP_FILE_BY_CODE[groupCode];
+          if (!fileName) {
+            return [groupCode, { vote_ids: [], votes: [] }] as const;
+          }
+          const response = await fetch(`${basePath}/data/${fileName}`);
+          if (!response.ok) {
+            return [groupCode, { vote_ids: [], votes: [] }] as const;
+          }
+          const data = (await response.json()) as IndexedVotesDoc;
+          return [groupCode, data] as const;
+        })
+      );
+      return Object.fromEntries(entries);
+    }
   );
   const { data: tooltipData } = useSWR<{ groups: { code: string; description: string }[] }>(
     `${basePath}/data/group-tooltips.json`,
@@ -444,108 +417,45 @@ export function DanishMEPVotesChart() {
   const [selectedMEP, setSelectedMEP] = useState<string | null>(null);
   const [expandedMEP, setExpandedMEP] = useState<string | null>(null);
 
-  // Build a map of vote_id → eurovoc keywords for topic filtering
-  const voteTopicMap = useMemo(() => {
-    if (!latestVotes) return null;
-    const map = new Map<string, string[]>();
-    for (const doc of latestVotes.documents) {
-      for (const v of doc.votes) {
-        map.set(String(v.vote_id), doc.eurovoc_keywords ?? []);
-      }
-    }
-    return map;
-  }, [latestVotes]);
+  const searchRegex = useMemo(() => buildSearchRegex(searchFilter), [searchFilter]);
 
-  // Count total topic-relevant vote IDs (used for per-topic loyalty).
-  // When a theme dataset is loaded, every vote in that file is by definition
-  // part of the theme — no further keyword filtering needed. Without a theme
-  // match we fall back to keyword matching against `latest_votes.json`.
-  const topicVoteIds = useMemo(() => {
-    if (!voteTopicMap || (!searchFilter && !eurovocFilter)) return null;
-    if (themeDataset) {
-      return new Set(voteTopicMap.keys());
-    }
-    const ids = new Set<string>();
-    for (const [vid, keywords] of voteTopicMap.entries()) {
-      if (eurovocFilter && keywords.some((kw) => kw.toLowerCase() === eurovocFilter.toLowerCase())) {
-        ids.add(vid);
-        continue;
-      }
-      if (searchFilter) {
-        // eslint-disable-next-line security/detect-non-literal-regexp -- input is fully escaped
-        const re = new RegExp(searchFilter.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-        if (keywords.some((kw) => re.test(kw))) {
-          ids.add(vid);
-        }
-      }
-    }
-    return ids;
-  }, [voteTopicMap, searchFilter, eurovocFilter, themeDataset]);
+  const voteMetaMap = useMemo(() => buildVoteMetaMap(latestVotes), [latestVotes]);
 
-  // Build MEP summaries
-  const summaries = useMemo((): MEPSummary[] => {
-    if (!mepData || !brudData) return [];
+  const voteTopicMap = useMemo(
+    () => buildVoteTopicMap(latestVotes, Boolean(themeDataset)),
+    [latestVotes, themeDataset]
+  );
 
-    const dkMeps = mepData.meps.filter((m) => m.country_code.includes("DNK") && m.current_group_id);
-    const allDisag = brudData.mep_vs_party.disagreements;
+  const topicVoteIds = useMemo(
+    () =>
+      buildTopicVoteIds({
+        hasTopicFilter,
+        isThemeMode: Boolean(themeDataset),
+        themeVoteIdsData,
+        voteTopicMap,
+        eurovocFilter,
+        searchRegex,
+      }),
+    [hasTopicFilter, themeDataset, themeVoteIdsData, voteTopicMap, eurovocFilter, searchRegex]
+  );
 
-    return dkMeps.map((mep) => {
-      const mepDisag = allDisag.filter((d) => d["MEP Name"] === mep.family_name);
+  const groupVoteMaps = useMemo(
+    () => buildGroupVoteMaps(groupIndexedVotesByCode),
+    [groupIndexedVotesByCode]
+  );
 
-      // Apply topic filter via search/eurovoc if provided
-      let filtered = mepDisag;
-      if ((searchFilter || eurovocFilter) && voteTopicMap) {
-        if (themeDataset) {
-          // Theme dataset = curated vote list; membership alone implies in-topic.
-          filtered = mepDisag.filter((d) => voteTopicMap.has(d["Vote ID"]));
-        } else {
-          /* eslint-disable sonarjs/no-nested-functions -- filter/some callbacks inside useMemo.map() */
-          filtered = mepDisag.filter((d) => {
-            const keywords = voteTopicMap.get(d["Vote ID"]);
-            if (!keywords) return false;
-            if (eurovocFilter && keywords.some((kw) => kw.toLowerCase() === eurovocFilter.toLowerCase())) return true;
-            if (searchFilter) {
-              // eslint-disable-next-line security/detect-non-literal-regexp -- input is fully escaped
-              const re = new RegExp(searchFilter.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-              const fields = [d["Short Title"], d["Document Title"], ...keywords];
-              return fields.some((f) => re.test(f));
-            }
-            return false;
-          });
-          /* eslint-enable sonarjs/no-nested-functions */
-        }
-      }
-
-      // Compute allies when breaking ranks
-      const allyMap: Record<string, number> = {};
-      for (const d of filtered) {
-        const mepVote = d["Vote Type"];
-        for (const gc of GROUP_CODES) {
-          if (gc === mep.current_group_id?.code) continue;
-          if (d[gc as keyof Disagreement] === mepVote) {
-            allyMap[gc] = (allyMap[gc] || 0) + 1;
-          }
-        }
-      }
-
-      const topAllies: AllyCount[] = Object.entries(allyMap)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 7)
-        .map(([group, count]) => ({
-          group,
-          count,
-          pct: filtered.length > 0 ? (count / filtered.length) * 100 : 0,
-        }));
-
-      return {
-        mep,
-        totalDisagreements: mepDisag.length,
-        filteredDisagreements: filtered,
-        topAllies,
-        topicVoteCount: topicVoteIds ? topicVoteIds.size : 0,
-      };
-    });
-  }, [mepData, brudData, voteTopicMap, searchFilter, eurovocFilter, topicVoteIds, themeDataset]);
+  const summaries = useMemo(
+    () =>
+      buildMepSummaries({
+        meps: mepData?.meps ?? [],
+        mepIndexedVotesById,
+        groupVoteMaps,
+        topicVoteIds,
+        hasTopicFilter,
+        voteMetaMap,
+      }),
+    [mepData, mepIndexedVotesById, groupVoteMaps, topicVoteIds, hasTopicFilter, voteMetaMap]
+  );
 
   // Sort by most breaks
   const sorted = useMemo(() => {
@@ -560,7 +470,7 @@ export function DanishMEPVotesChart() {
 
   // ─── Loading state ─────────────────────────────────────────────────────────
 
-  if (!mepData || !brudData) {
+  if (!mepData || !latestVotes || !mepIndexedVotesById || !groupIndexedVotesByCode || (themeDataset && !themeVoteIdsData)) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
@@ -576,7 +486,6 @@ export function DanishMEPVotesChart() {
 
   // ─── Overview ──────────────────────────────────────────────────────────────
 
-  const hasTopicFilter = !!(searchFilter || eurovocFilter);
   const hasThemeDataset = Boolean(themeDataset);
 
   return (
@@ -638,7 +547,7 @@ export function DanishMEPVotesChart() {
                   {/* Photo */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={toLocalPhotoUrl(s.mep.full_name, basePath)}
+                    src={toDanishMepLocalPhotoUrl(s.mep.full_name, basePath)}
                     alt={s.mep.full_name}
                     className="w-12 h-12 rounded-full object-cover border border-gray-200 flex-shrink-0"
                     onError={(e) => {
@@ -730,7 +639,10 @@ export function DanishMEPVotesChart() {
                     <>
                       <div className="pt-3 pb-1">
                         <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-3">
-                          {LABELS.accordionHeader.replace("{name}", s.mep.family_name)}
+                          {LABELS.accordionHeader
+                            .replace("{count}", String(filteredCount))
+                            .replace("{name}", s.mep.family_name)
+                            .replace("{group}", s.mep.current_group_id?.name || s.mep.current_group_id?.code || "gruppen")}
                         </p>
                         <AllyBar allies={s.topAllies} mepGroup={s.mep.current_group_id?.code || "N/A"} groupDescriptions={groupDescriptions} />
                       </div>
@@ -744,7 +656,11 @@ export function DanishMEPVotesChart() {
                         })()}
                         className="mt-4 flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                       >
-                        Se seneste afstemninger
+                        {(() => {
+                          const groupName = s.mep.current_group_id?.name || s.mep.current_group_id?.code || "gruppen";
+                          const groupNameGenitive = groupName.endsWith("s") ? groupName : `${groupName}s`;
+                          return `Se afstemninger, hvor ${s.mep.family_name} ikke har fulgt ${groupNameGenitive} flertal`;
+                        })()}
                         <ArrowRight className="w-4 h-4" />
                       </Link>
                     </>

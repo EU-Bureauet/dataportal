@@ -13,6 +13,65 @@ function getDataBasePath(): string {
 }
 
 /**
+ * Compares two entities' vote arrays by matching on `vote_id`, not on raw
+ * array position. The per-entity vote_ids/votes arrays are NOT guaranteed to
+ * be aligned index-for-index across entities (e.g. two political groups'
+ * files can diverge partway through if either one has a gap), so comparing
+ * `votes1[i]` to `votes2[i]` silently compares unrelated votes past the
+ * first divergence. Joining on vote_id avoids that entirely.
+ */
+function compareByVoteId(
+  voteIds1: string[],
+  votes1: (number | null)[],
+  voteIds2: string[],
+  votes2: (number | null)[]
+): ComparisonResult {
+  const votesById2 = new Map<string, number | null>();
+  for (let i = 0; i < voteIds2.length; i++) votesById2.set(voteIds2[i], votes2[i]);
+
+  const agreements: VoteComparison[] = [];
+  const disagreements: VoteComparison[] = [];
+
+  for (let i = 0; i < voteIds1.length; i++) {
+    const voteId = voteIds1[i];
+    if (!votesById2.has(voteId)) continue;
+
+    const vote1 = votes1[i];
+    const vote2 = votesById2.get(voteId) ?? null;
+
+    // Only compare if both voted (not null)
+    if (vote1 !== null && vote2 !== null) {
+      const comparison: VoteComparison = {
+        vote_id: voteId,
+        index: i,
+        entity1_vote: vote1,
+        entity2_vote: vote2,
+        agreement: vote1 === vote2
+      };
+
+      if (vote1 === vote2) {
+        agreements.push(comparison);
+      } else {
+        disagreements.push(comparison);
+      }
+    }
+  }
+
+  const totalComparable = agreements.length + disagreements.length;
+  const agreementRate = totalComparable > 0 ? (agreements.length / totalComparable) * 100 : 0;
+
+  return {
+    agreement_rate: parseFloat(agreementRate.toFixed(1)),
+    disagreement_rate: parseFloat((100 - agreementRate).toFixed(1)),
+    total_comparable_votes: totalComparable,
+    agreement_count: agreements.length,
+    disagreement_count: disagreements.length,
+    agreements,
+    disagreements
+  };
+}
+
+/**
  * Load MEP vote data from API
  */
 export async function loadMEPVoteData(mepId: string): Promise<MEPVoteData> {
@@ -65,44 +124,10 @@ export async function compareMEPs(mepId1: string, mepId2: string): Promise<Compa
     loadMEPVoteData(mepId2)
   ]);
 
-  const agreements: VoteComparison[] = [];
-  const disagreements: VoteComparison[] = [];
-
-  for (let i = 0; i < Math.min(mep1.votes.length, mep2.votes.length); i++) {
-    const vote1 = mep1.votes[i];
-    const vote2 = mep2.votes[i];
-
-    // Only compare if both voted (not null)
-    if (vote1 !== null && vote2 !== null) {
-      const comparison: VoteComparison = {
-        vote_id: mep1.vote_ids[i],
-        index: i,
-        entity1_vote: vote1,
-        entity2_vote: vote2,
-        agreement: vote1 === vote2
-      };
-
-      if (vote1 === vote2) {
-        agreements.push(comparison);
-      } else {
-        disagreements.push(comparison);
-      }
-    }
-  }
-
-  const totalComparable = agreements.length + disagreements.length;
-  const agreementRate = totalComparable > 0 ? (agreements.length / totalComparable) * 100 : 0;
-
   return {
     mep1_info: mep1.mep_info,
     mep2_info: mep2.mep_info,
-    agreement_rate: parseFloat(agreementRate.toFixed(1)),
-    disagreement_rate: parseFloat((100 - agreementRate).toFixed(1)),
-    total_comparable_votes: totalComparable,
-    agreement_count: agreements.length,
-    disagreement_count: disagreements.length,
-    agreements,
-    disagreements
+    ...compareByVoteId(mep1.vote_ids, mep1.votes, mep2.vote_ids, mep2.votes)
   };
 }
 
@@ -115,44 +140,10 @@ export async function compareGroups(groupId1: string, groupId2: string): Promise
     loadGroupVoteData(groupId2)
   ]);
 
-  const agreements: VoteComparison[] = [];
-  const disagreements: VoteComparison[] = [];
-
-  for (let i = 0; i < Math.min(group1.votes.length, group2.votes.length); i++) {
-    const vote1 = group1.votes[i];
-    const vote2 = group2.votes[i];
-
-    // Only compare if both voted (not null)
-    if (vote1 !== null && vote2 !== null) {
-      const comparison: VoteComparison = {
-        vote_id: group1.vote_ids[i],
-        index: i,
-        entity1_vote: vote1,
-        entity2_vote: vote2,
-        agreement: vote1 === vote2
-      };
-
-      if (vote1 === vote2) {
-        agreements.push(comparison);
-      } else {
-        disagreements.push(comparison);
-      }
-    }
-  }
-
-  const totalComparable = agreements.length + disagreements.length;
-  const agreementRate = totalComparable > 0 ? (agreements.length / totalComparable) * 100 : 0;
-
   return {
     group1_info: group1.group_info,
     group2_info: group2.group_info,
-    agreement_rate: parseFloat(agreementRate.toFixed(1)),
-    disagreement_rate: parseFloat((100 - agreementRate).toFixed(1)),
-    total_comparable_votes: totalComparable,
-    agreement_count: agreements.length,
-    disagreement_count: disagreements.length,
-    agreements,
-    disagreements
+    ...compareByVoteId(group1.vote_ids, group1.votes, group2.vote_ids, group2.votes)
   };
 }
 
@@ -165,44 +156,10 @@ export async function compareMEPWithGroup(mepId: string, groupId: string): Promi
     loadGroupVoteData(groupId)
   ]);
 
-  const agreements: VoteComparison[] = [];
-  const disagreements: VoteComparison[] = [];
-
-  for (let i = 0; i < Math.min(mep.votes.length, group.votes.length); i++) {
-    const vote1 = mep.votes[i];
-    const vote2 = group.votes[i];
-
-    // Only compare if both voted (not null)
-    if (vote1 !== null && vote2 !== null) {
-      const comparison: VoteComparison = {
-        vote_id: mep.vote_ids[i],
-        index: i,
-        entity1_vote: vote1,
-        entity2_vote: vote2,
-        agreement: vote1 === vote2
-      };
-
-      if (vote1 === vote2) {
-        agreements.push(comparison);
-      } else {
-        disagreements.push(comparison);
-      }
-    }
-  }
-
-  const totalComparable = agreements.length + disagreements.length;
-  const agreementRate = totalComparable > 0 ? (agreements.length / totalComparable) * 100 : 0;
-
   return {
     mep_info: mep.mep_info,
     group_info: group.group_info,
-    agreement_rate: parseFloat(agreementRate.toFixed(1)),
-    disagreement_rate: parseFloat((100 - agreementRate).toFixed(1)),
-    total_comparable_votes: totalComparable,
-    agreement_count: agreements.length,
-    disagreement_count: disagreements.length,
-    agreements,
-    disagreements
+    ...compareByVoteId(mep.vote_ids, mep.votes, group.vote_ids, group.votes)
   };
 }
 

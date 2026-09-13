@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Card } from "@/components/ui/card";
 import NewsCarousel from "@/components/news-carousel";
+import { ThemeExplorationCards } from "@/components/theme-exploration-cards";
 
 interface FeatureCard {
   title: string;
@@ -144,6 +145,10 @@ export default function LandingPage() {
 
       {/* Features Grid */}
       <div className="max-w-7xl mx-auto px-6 pb-24">
+        <div className="mb-8">
+          <ThemeExplorationCards />
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature, index) => (
             <Link key={index} href={feature.href}>

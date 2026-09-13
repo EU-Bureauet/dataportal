@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { HeroSection } from "@/components/hero-section";
 import { ThemeArticles } from "@/components/theme-articles";
 import { VisualisationCard } from "@/components/visualisation-card";
-import { ThemeDonutChart, type ThemeVotesData } from "@/components/theme-donut-chart";
+import { ThemeDonutSection } from "@/components/theme-donut-section";
 import { ThemeVideoFab } from "@/components/theme-video-fab";
 
 interface ThemeArticleFilter {
@@ -65,18 +65,13 @@ function getThemeData(slug: string): ThemeData | null {
 }
 
 export async function generateStaticParams() {
+  // Generate a static page for every theme, published or not. Whether a
+  // theme is *linked from* the menu/homepage is decided separately by
+  // NavigationHeader and ThemeExplorationCards (both filter on `published`).
+  // Keeping the route itself generated for unpublished themes lets us hand
+  // out an unlisted URL for testing before a theme goes live.
   const allSlugs = getThemeSlugs();
-  const publishedSlugs = allSlugs
-    .filter((slug) => {
-      const theme = getThemeData(slug);
-      return theme?.published === true;
-    });
-
-  // Static export fails when a dynamic route has no generated params.
-  // If all themes are currently unpublished, still emit params so export works.
-  const slugsToExport = publishedSlugs.length > 0 ? publishedSlugs : allSlugs;
-
-  return slugsToExport.map((slug) => ({ slug }));
+  return allSlugs.map((slug) => ({ slug }));
 }
 
 export const dynamicParams = false;
@@ -86,6 +81,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const theme = getThemeData(slug);
   return {
     title: theme ? `Tema: ${theme.title}` : "Tema",
+    // Unpublished themes are reachable via direct link (for testing) but
+    // should never be indexed by search engines.
+    ...(theme && theme.published !== true
+      ? { robots: { index: false, follow: false } }
+      : {}),
   };
 }
 
@@ -93,7 +93,7 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
   const { slug } = await params;
   const theme = getThemeData(slug);
 
-  if (!theme || theme.published !== true) {
+  if (!theme) {
     notFound();
   }
 
@@ -114,21 +114,14 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
   };
   const themeAccentColor = themeAccentColors[theme.slug] ?? themeAccentColors.forsvar;
 
-  // Load tag-cloud data for this theme. Filename mapping keeps the JSON
-  // files self-contained and avoids touching the existing themes/*.json.
+  // Theme votes dataset filename for the donut chart. The dataset is fetched
+  // client-side from /data so updates can appear without rebuilding.
   const themeVotesFiles: Record<string, string> = {
     forsvar: "theme_votes_forsvar_sikkerhed.json",
     miljoe: "theme_votes_miljo_sundhed.json",
     energi: "theme_votes_energi_industri.json",
   };
-  let themeVotesData: ThemeVotesData | null = null;
   const themeVotesFilename = themeVotesFiles[theme.slug];
-  if (themeVotesFilename) {
-    const themeVotesPath = path.join(getProjectRoot(), "data", themeVotesFilename);
-    if (fs.existsSync(themeVotesPath)) {
-      themeVotesData = JSON.parse(fs.readFileSync(themeVotesPath, "utf-8")) as ThemeVotesData;
-    }
-  }
 
   return (
     <div>
@@ -163,19 +156,17 @@ export default async function ThemePage({ params }: { params: Promise<{ slug: st
             </div>
 
             {/* Donut chart over the votes that make up this theme. */}
-            {themeVotesData && (() => {
+            {(() => {
               const latestVotesVis = theme.visualisations.find(
                 (v) => v.dataSource?.file === "latest_votes.json"
               );
               return (
-                <div className="mt-4 bg-white rounded-xl shadow-md border border-gray-100 px-6 sm:px-8 py-3 sm:py-4">
-                  <ThemeDonutChart
-                    data={themeVotesData}
-                    accentColor={themeAccentColor}
-                    latestVotesSearch={latestVotesVis?.dataSource?.search}
-                    latestVotesEurovoc={latestVotesVis?.dataSource?.eurovoc}
-                  />
-                </div>
+                <ThemeDonutSection
+                  themeVotesFilename={themeVotesFilename}
+                  accentColor={themeAccentColor}
+                  latestVotesSearch={latestVotesVis?.dataSource?.search}
+                  latestVotesEurovoc={latestVotesVis?.dataSource?.eurovoc}
+                />
               );
             })()}
           </section>

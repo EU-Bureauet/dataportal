@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { VoteGroupCard, FilterPanel, useDocDeepLink, type VoteGroup } from "./components";
 import { matchThemeDataset } from "@/lib/theme-datasets";
+import { GROUP_FILE_BY_CODE } from "@/lib/danish-mep-votes-helpers";
+import type { IndexedVotesDoc, MEPClean } from "@/lib/danish-mep-votes-helpers";
 
 interface Vote {
   vote_id: string;
@@ -111,14 +113,6 @@ export default function LatestVotesPage() {
   );
 }
 
-interface Disagreement {
-  "Vote ID": string;
-  "MEP Name": string;
-}
-interface BrudData {
-  mep_vs_party: { disagreements: Disagreement[] };
-}
-
 function LatestVotesContent() {
   const basePath = process.env.NEXT_PUBLIC_BASEPATH || "dataportal";
   const searchParams = useSearchParams();
@@ -160,23 +154,54 @@ function LatestVotesContent() {
   const { data: rawData, error, isLoading } = useSWR<LatestVotesData>(url, fetcher);
   const data = themeDataset && rawData ? normalizeThemeData(rawData) : rawData;
 
-  // Fetch disagreements data for MEP filtering
-  const { data: brudData } = useSWR<BrudData>(
-    selectedMep ? `/${basePath}/data/Danske_MEPs_brud_med_partigruppelinjen.json` : null,
-    fetcher
+  // Build vote IDs where the selected MEP broke with their group using the
+  // same mep/group vote-array method as /danish-mep-votes.
+  const { data: mepBreakVoteIdList } = useSWR<string[]>(
+    selectedMep ? `/${basePath}/derived/mep-break-votes/${selectedMep}` : null,
+    async () => {
+      const mepData = await fetcher<{ meps: MEPClean[] }>(`/${basePath}/data/meps_clean.json`);
+      const selected = mepData.meps.find(
+        (m) =>
+          m.country_code.includes("DNK") &&
+          m.family_name.toLowerCase() === selectedMep!.toLowerCase()
+      );
+
+      if (!selected?.current_group_id?.code) return [];
+
+      const groupCode = selected.current_group_id.code as keyof typeof GROUP_FILE_BY_CODE;
+      const groupFile = GROUP_FILE_BY_CODE[groupCode];
+      if (!groupFile) return [];
+
+      const [mepVotes, groupVotes] = await Promise.all([
+        fetcher<IndexedVotesDoc>(`/${basePath}/data/mep_${selected.mep_id}.json`),
+        fetcher<IndexedVotesDoc>(`/${basePath}/data/${groupFile}`),
+      ]);
+
+      const groupVoteMap = new Map<string, number>();
+      const groupLen = Math.min(groupVotes.vote_ids.length, groupVotes.votes.length);
+      for (let i = 0; i < groupLen; i++) {
+        groupVoteMap.set(String(groupVotes.vote_ids[i]), groupVotes.votes[i]);
+      }
+
+      const breakIds: string[] = [];
+      const mepLen = Math.min(mepVotes.vote_ids.length, mepVotes.votes.length);
+      for (let i = 0; i < mepLen; i++) {
+        const voteId = String(mepVotes.vote_ids[i]);
+        const mepVote = mepVotes.votes[i];
+        const groupVote = groupVoteMap.get(voteId);
+        if (typeof mepVote === "number" && groupVote !== undefined && mepVote !== groupVote) {
+          breakIds.push(voteId);
+        }
+      }
+
+      return breakIds;
+    }
   );
 
-  // Build set of vote IDs where the selected MEP broke with their group
   const mepBreakVoteIds = useMemo(() => {
-    if (!selectedMep || !brudData) return null;
-    const ids = new Set<string>();
-    for (const d of brudData.mep_vs_party.disagreements) {
-      if (d["MEP Name"] === selectedMep) {
-        ids.add(String(d["Vote ID"]));
-      }
-    }
-    return ids;
-  }, [selectedMep, brudData]);
+    if (!selectedMep || !mepBreakVoteIdList) return null;
+    return new Set(mepBreakVoteIdList.map(String));
+  }, [selectedMep, mepBreakVoteIdList]);
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const hasActiveSearch = normalizedQuery.length >= 2;
