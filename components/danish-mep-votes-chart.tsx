@@ -129,8 +129,24 @@ function LoyaltyBar({
   const loyalRatePct = participated > 0 ? (loyalCount / participated) * 100 : 0;
   const againstRatePct = participated > 0 ? (against / participated) * 100 : 0;
   const participatedLabel = participated.toLocaleString("da-DK");
+  const totalLabel = totalEffective.toLocaleString("da-DK");
   const loyalLabel = loyalCount.toLocaleString("da-DK");
   const againstLabel = against.toLocaleString("da-DK");
+  const absentLabel = absentCount.toLocaleString("da-DK");
+  // "Ikke stemt" is deliberately never shown as a percentage next to "med
+  // gruppen"/"brud": those two are rates among the votes the MEP actually
+  // took part in, while "ikke stemt" necessarily uses a different, larger
+  // base (the full scope). Showing it as a plain count avoids presenting
+  // two percentages with different denominators side by side.
+  const absentTitle = absentIsExact
+    ? `${absentLabel} afstemninger ikke stemt`
+    : `ca. ${absentLabel} afstemninger ikke stemt`;
+  let participationFootnote: string | null = null;
+  if (hasAbsent) {
+    participationFootnote = absentIsExact
+      ? `Deltog i ${participatedLabel} af ${totalLabel} afstemninger om emnet.`
+      : `Deltog i ${participatedLabel} af ca. ${totalLabel} afstemninger i alt.`;
+  }
 
   return (
     <div className="w-full">
@@ -149,16 +165,19 @@ function LoyaltyBar({
           <div
             className="h-full bg-gray-300 transition-all duration-500"
             style={{ width: `${absentBarPct}%` }}
-            title={`${absentBarPct.toFixed(1)}% ikke stemt (${absentIsExact ? "" : "ca. "}${absentCount.toLocaleString("da-DK")} afstemninger)`}
+            title={absentTitle}
           />
         )}
       </div>
-      {/* Percentages aligned to bar segments */}
+      {/* Percentages aligned to bar segments. "Ikke stemt" shows a count,
+          not a percentage — see note above. */}
       <div className="flex text-xs mt-1">
         <span style={{ width: `${loyalBarPct}%` }} className="text-gray-600 truncate">{loyalRatePct.toFixed(1)}%</span>
         <span style={{ width: `${againstBarPct}%` }} className="text-gray-600 text-center truncate">{againstRatePct.toFixed(1)}%</span>
         {hasAbsent && (
-          <span style={{ minWidth: '2.5rem' }} className="text-gray-400 text-right flex-shrink-0">{absentBarPct.toFixed(1)}%</span>
+          <span style={{ minWidth: '5.5rem' }} className="text-gray-400 text-right truncate flex-shrink-0" title={absentTitle}>
+            {absentLabel} ikke stemt
+          </span>
         )}
       </div>
       {/* Color legend */}
@@ -169,6 +188,9 @@ function LoyaltyBar({
           <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-gray-300 inline-block" /> Ikke stemt</span>
         )}
       </div>
+      {participationFootnote && (
+        <p className="text-xs text-gray-400 mt-1">{participationFootnote}</p>
+      )}
     </div>
   );
 }
