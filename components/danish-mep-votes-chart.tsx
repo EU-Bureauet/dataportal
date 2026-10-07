@@ -149,7 +149,7 @@ function LoyaltyBar({
           <div
             className="h-full bg-gray-300 transition-all duration-500"
             style={{ width: `${absentBarPct}%` }}
-            title={`${absentBarPct.toFixed(1)}% fravær (${absentIsExact ? "" : "ca. "}${absentCount.toLocaleString("da-DK")} afstemninger)`}
+            title={`${absentBarPct.toFixed(1)}% ikke stemt (${absentIsExact ? "" : "ca. "}${absentCount.toLocaleString("da-DK")} afstemninger)`}
           />
         )}
       </div>
@@ -166,7 +166,7 @@ function LoyaltyBar({
         <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" /> Med gruppen</span>
         <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-500 inline-block" /> Brud</span>
         {hasAbsent && (
-          <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-gray-300 inline-block" /> Fravær</span>
+          <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-gray-300 inline-block" /> Ikke stemt</span>
         )}
       </div>
     </div>
