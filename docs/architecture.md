@@ -113,7 +113,7 @@ Hver feature-side renderer ét eller flere diagramkomponenter med data fra JSON-
 | Side | Hovedkomponent | Datafil(er) |
 |------|----------------|-------------|
 | `/heatmap` | `HeatmapGrid` | `All_Pairwise_coalitions.json` |
-| `/heatmap?theme=<key>` | `HeatmapGrid` (tema-tilstand, udvalgsvælger skjult) | `All_Pairwise_coalitions.json[theme_<key>]` |
+| `/heatmap?theme=<key>` | `HeatmapGrid` (tema-tilstand, udvalgsvælger skjult) | `All_Pairwise_coalitions.json` (`TOTAL[].theme_counts`) + `theme_votes_<key>.json` |
 | `/winning-coalitions` | `CoalitionsSunburst` | `All_Winning_coalitions.json` |
 | `/group-wins` | `GroupWinsChart` | `All_Group_wins.json` |
 | `/latest-votes` | Vote-liste + filtre | `latest_votes.json` |
@@ -182,7 +182,7 @@ data/themes/<slug>.json
   └── visualisations[].href
         ├─ /latest-votes?search=&eurovoc=    → slår tema-dataset op via search|eurovoc-key
         │                                       └─ indlæser theme_votes_<key>.json
-        ├─ /heatmap?theme=<theme_<key>>      → indlæser All_Pairwise_coalitions.json[theme_<key>]
+        ├─ /heatmap?theme=<theme_<key>>      → udleder fra All_Pairwise_coalitions.json TOTAL[].theme_counts
         ├─ /danish-mep-votes?search=&eurovoc= → deep-link videre til /latest-votes (tema-tilstand)
         └─ /theme-winning-coalitions?committee=&theme=
               └─ indlæser All_Group_wins.json + All_Winning_coalitions.json
@@ -196,11 +196,11 @@ Danske_MEPs_brud_med_partigruppelinjen.json
         (så ?mep=<navn>&search=<tema>&eurovoc=<…> filtrerer til MEP'ens brud inden for temaet)
 ```
 
-Nøglen `theme_<key>` (fx `theme_forsvar_sikkerhed`) er den samme i alle tre `All_*` filer og i `theme_votes_*.json` (`metadata.theme`), så nye temaer kun kræver konsistente nøgler i de fire datafiler plus en konfigurationsfil under `data/themes/`.
+Tema-data ligger ikke som separate nøgler i de tre `All_*` filer. I stedet har hver række under `TOTAL` et `theme_counts`-felt med antal pr. tema-id (fx `{"forsvar_sikkerhed": 522, ...}`). Tema-id'et er nøglen `theme_<key>` (fx `theme_forsvar_sikkerhed`, som også står i `theme_votes_*.json` `metadata.theme`) uden `theme_`-præfikset.
 
 ### Heatmap i tema-tilstand
 
-Når `/heatmap` modtager `?theme=theme_<key>`, slår siden den nøgle op direkte i `All_Pairwise_coalitions.json` og skjuler udvalgsvælgeren — brugeren kan ikke skifte til et udvalg, mens et tema er aktivt. Tema-nøgler ekskluderes også fra udvalgs-dropdownen i normal tilstand.
+Når `/heatmap` modtager `?theme=theme_<key>`, udleder siden tema-procenterne fra `TOTAL[].theme_counts` divideret med `metadata.votes_total` i `theme_votes_<key>.json` og skjuler udvalgsvælgeren — brugeren kan ikke skifte til et udvalg, mens et tema er aktivt. Tema-nøgler ekskluderes også fra udvalgs-dropdownen i normal tilstand.
 
 ### Latest-votes i tema-tilstand
 
@@ -223,7 +223,7 @@ npm run lint      # ESLint + TypeScript check
 - Kryds-datasæt konsistens (gruppe-ID'er matcher på tværs af filer)
 - At transformationer producerer korrekt output fra rådata
 - At hver `theme_votes_*.json` har korrekt struktur, og at de præcomputerede tile-tællinger (`committees[]`, `eurovoc[]`) matcher de faktiske dokumenter
-- At hver tema-nøgle (`theme_<key>`) findes i `All_Pairwise_coalitions.json`, `All_Group_wins.json` og `All_Winning_coalitions.json` med valide records
+- At hver `TOTAL`-række i `All_Pairwise_coalitions.json`, `All_Group_wins.json` og `All_Winning_coalitions.json` har valide `theme_counts` for hvert tema (ikke over rækkens samlede antal eller temaets `votes_total`)
 - At tema-vote-IDs overlapper med MEP-disagreement-datasettet, så deep-links fra `/danish-mep-votes` ikke giver tomme lister
 
 ---

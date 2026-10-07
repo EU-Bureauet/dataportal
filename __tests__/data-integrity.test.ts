@@ -37,6 +37,7 @@ import {
 import type {
   PairwiseCoalitionsData,
   CoalitionsData,
+  GroupWin,
   GroupWinsData,
   MEPData,
   VoteDetails,
@@ -580,19 +581,26 @@ describe('Danish MEP disagreements → Danish MEP votes chart', () => {
 // ── National party disagreements → National party view ───────
 
 describe('National party disagreements → National party view', () => {
+  // Index file only; per-party disagreements live in
+  // national_party_disagreements/<country_code>_<party_code>.json
   let data: {
     metadata: Record<string, unknown>
-    parties: Record<string, {
-      party_info: { name: string; total_meps: number }
-      disagreement_statistics: {
-        total_disagreements: number
-        disagreement_rate_percent: number
-      }
+    parties: Array<{
+      id: string
+      national_party: string
+      country: string
+      country_code: string
+      party_code: string
+      political_groups: string[]
+      meps: Array<{ mep_id: string; name: string }>
+      total_votes_with_participation: number
+      disagreement_count: number
+      disagreement_rate_percent: number
     }>
   }
 
   beforeAll(() => {
-    data = loadJson('national_party_disagreements.json')
+    data = loadJson('National_Party_Disagreements.json')
   })
 
   it('has metadata with total_parties_analyzed', () => {
@@ -600,29 +608,40 @@ describe('National party disagreements → National party view', () => {
     expect(data.metadata).toHaveProperty('total_parties_analyzed')
   })
 
-  it('has parties object with at least one party', () => {
-    expect(data).toHaveProperty('parties')
-    expect(Object.keys(data.parties).length).toBeGreaterThan(0)
+  it('has parties array with at least one party', () => {
+    expect(Array.isArray(data.parties)).toBe(true)
+    expect(data.parties.length).toBeGreaterThan(0)
   })
 
-  it('every party has party_info and disagreement_statistics', () => {
-    for (const [, party] of Object.entries(data.parties)) {
-      expect(party).toHaveProperty('party_info')
-      expect(party).toHaveProperty('disagreement_statistics')
-      expect(party.party_info).toHaveProperty('name')
-      expect(party.party_info).toHaveProperty('total_meps')
-      expect(party.disagreement_statistics).toHaveProperty('total_disagreements')
-      expect(party.disagreement_statistics).toHaveProperty('disagreement_rate_percent')
+  it('every party has identifying fields and disagreement statistics', () => {
+    for (const party of data.parties) {
+      expect(typeof party.national_party).toBe('string')
+      expect(typeof party.country).toBe('string')
+      expect(party.country_code).toMatch(/^[A-Z]{2}$/)
+      expect(party.party_code.length).toBeGreaterThan(0)
+      expect(Array.isArray(party.political_groups)).toBe(true)
+      expect(Array.isArray(party.meps)).toBe(true)
+      expect(typeof party.total_votes_with_participation).toBe('number')
+      expect(typeof party.disagreement_count).toBe('number')
+      expect(party.disagreement_count).toBeLessThanOrEqual(party.total_votes_with_participation)
     }
+  })
+
+  it('country_code + party_code is unique (used to build detail file paths)', () => {
+    const keys = data.parties.map((p) => `${p.country_code}_${p.party_code}`)
+    expect(new Set(keys).size).toBe(keys.length)
   })
 
   it('disagreement rates are between 0 and 100', () => {
-    for (const [, party] of Object.entries(data.parties)) {
-      expect(party.disagreement_statistics.disagreement_rate_percent)
-        .toBeGreaterThanOrEqual(0)
-      expect(party.disagreement_statistics.disagreement_rate_percent)
-        .toBeLessThanOrEqual(100)
+    for (const party of data.parties) {
+      expect(party.disagreement_rate_percent).toBeGreaterThanOrEqual(0)
+      expect(party.disagreement_rate_percent).toBeLessThanOrEqual(100)
     }
+  })
+
+  it('parties are sorted by disagreement_count descending', () => {
+    const counts = data.parties.map((p) => p.disagreement_count)
+    expect(counts).toEqual([...counts].sort((a, b) => b - a))
   })
 })
 
@@ -911,7 +930,12 @@ describe('Theme votes → Theme pages, latest-votes (theme mode) & donut chart',
   }
 })
 
-describe('Theme groupings in coalition datasets → Heatmap & coalition charts', () => {
+describe('Theme counts in coalition datasets → Heatmap & coalition charts', () => {
+  // Theme data is not stored as separate `theme_*` groupings. Instead every
+  // TOTAL row carries `theme_counts` keyed by theme id (e.g. `forsvar_sikkerhed`),
+  // which the heatmap turns into percentages using the theme's votes_total.
+  type ThemeCounted = { theme_counts?: Record<string, number> }
+
   let pairwise: PairwiseCoalitionsData
   let groupWins: GroupWinsData
   let coalitions: CoalitionsData
@@ -922,86 +946,57 @@ describe('Theme groupings in coalition datasets → Heatmap & coalition charts',
     coalitions = loadJson<CoalitionsData>('All_Winning_coalitions.json')
   })
 
-  for (const { themeKey } of THEME_FIXTURES) {
+  for (const { file, themeKey } of THEME_FIXTURES) {
+    const themeId = themeKey.replace(/^theme_/, '')
+
     describe(themeKey, () => {
-      it('exists in All_Pairwise_coalitions.json with valid records', () => {
-        const records = (pairwise as Record<string, unknown>)[themeKey] as Array<{
-          'Group Pair': [string, string]
-          Total: number
-          Count: number
-          Percentage: number
-        }>
-        expect(Array.isArray(records)).toBe(true)
-        expect(records.length).toBeGreaterThan(0)
-        for (const r of records) {
-          expect(Array.isArray(r['Group Pair'])).toBe(true)
-          expect(r['Group Pair']).toHaveLength(2)
-          expect(typeof r.Total).toBe('number')
-          expect(typeof r.Count).toBe('number')
-          expect(typeof r.Percentage).toBe('number')
-          expect(r.Count).toBeLessThanOrEqual(r.Total)
+      let votesTotal: number
+
+      beforeAll(() => {
+        votesTotal = loadJson<ThemeVotesFile>(file).metadata.votes_total
+      })
+
+      const expectValidThemeCount = (row: ThemeCounted, overallCount: number) => {
+        const count = row.theme_counts?.[themeId]
+        expect(Number.isInteger(count)).toBe(true)
+        expect(count).toBeGreaterThanOrEqual(0)
+        expect(count).toBeLessThanOrEqual(overallCount)
+        expect(count).toBeLessThanOrEqual(votesTotal)
+      }
+
+      it('has valid theme_counts on every TOTAL row in All_Pairwise_coalitions.json', () => {
+        expect(pairwise.TOTAL.length).toBeGreaterThan(0)
+        for (const r of pairwise.TOTAL) expectValidThemeCount(r, r.Count)
+      })
+
+      it('has valid theme_counts on every TOTAL row in All_Group_wins.json', () => {
+        const rows = groupWins.TOTAL.total_group_wins as Array<GroupWin & ThemeCounted>
+        expect(rows.length).toBeGreaterThan(0)
+        for (const r of rows) expectValidThemeCount(r, r['Win Count'])
+      })
+
+      it('has valid theme_counts on every TOTAL row in All_Winning_coalitions.json', () => {
+        const rows = coalitions.TOTAL.total_coalitions as Array<{ Count: number } & ThemeCounted>
+        expect(rows.length).toBeGreaterThan(0)
+        for (const r of rows) expectValidThemeCount(r, r.Count)
+      })
+
+      it('heatmap matrix can be built from the theme-derived pairwise rows', () => {
+        // Mirrors the derivation in app/heatmap/page.tsx
+        const derived = pairwise.TOTAL.map((r) => {
+          const count = r.theme_counts?.[themeId] ?? 0
+          return { ...r, Total: votesTotal, Count: count, Percentage: Math.round((count / votesTotal) * 1000) / 10 }
+        })
+        for (const r of derived) {
           expect(r.Percentage).toBeGreaterThanOrEqual(0)
           expect(r.Percentage).toBeLessThanOrEqual(100)
         }
-      })
-
-      it('exists in All_Group_wins.json with valid Group Win records', () => {
-        const records = (groupWins as Record<string, unknown>)[themeKey] as Array<{
-          'Group ID': string
-          'Win Count': number
-          'Win Percentage': number
-        }>
-        expect(Array.isArray(records)).toBe(true)
-        expect(records.length).toBeGreaterThan(0)
-        for (const r of records) {
-          expect(typeof r['Group ID']).toBe('string')
-          expect(typeof r['Win Count']).toBe('number')
-          expect(typeof r['Win Percentage']).toBe('number')
-          expect(r['Win Percentage']).toBeGreaterThanOrEqual(0)
-          expect(r['Win Percentage']).toBeLessThanOrEqual(100)
-          expect(GROUP_COLORS).toHaveProperty(r['Group ID'])
-        }
-      })
-
-      it('exists in All_Winning_coalitions.json with valid coalition records', () => {
-        const records = (coalitions as Record<string, unknown>)[themeKey] as Array<{
-          'Winning Coalition': string[]
-          Count: number
-          Percentage: number
-        }>
-        expect(Array.isArray(records)).toBe(true)
-        expect(records.length).toBeGreaterThan(0)
-        for (const r of records) {
-          expect(Array.isArray(r['Winning Coalition'])).toBe(true)
-          expect(r['Winning Coalition'].length).toBeGreaterThan(0)
-          expect(typeof r.Count).toBe('number')
-          expect(typeof r.Percentage).toBe('number')
-          expect(r.Percentage).toBeGreaterThanOrEqual(0)
-          expect(r.Percentage).toBeLessThanOrEqual(100)
-        }
+        const matrix = buildMatrixFromPairwise(derived)
+        expect(Array.isArray(matrix)).toBe(true)
+        expect(matrix.length).toBeGreaterThan(0)
       })
     })
   }
-
-  it('every theme key in pairwise data is also present in group wins and winning coalitions', () => {
-    const pairwiseThemes = Object.keys(pairwise).filter((k) => k.startsWith('theme_'))
-    expect(pairwiseThemes.length).toBeGreaterThan(0)
-    for (const k of pairwiseThemes) {
-      expect(groupWins).toHaveProperty(k)
-      expect(coalitions).toHaveProperty(k)
-    }
-  })
-
-  it('heatmap matrix can be built from each theme pairwise grouping', () => {
-    for (const { themeKey } of THEME_FIXTURES) {
-      const records = (pairwise as Record<string, unknown>)[themeKey] as Parameters<
-        typeof buildMatrixFromPairwise
-      >[0]
-      const matrix = buildMatrixFromPairwise(records)
-      expect(Array.isArray(matrix)).toBe(true)
-      expect(matrix.length).toBeGreaterThan(0)
-    }
-  })
 })
 
 describe('Theme votes ↔ MEP disagreements cross-link', () => {

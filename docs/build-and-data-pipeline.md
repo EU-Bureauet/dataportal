@@ -17,7 +17,7 @@ Dataportal er et statisk genereret Next.js site. Det meste data leveres som stat
 npm run build              # Fuld pipeline: prebuild → next build → statisk /out
 npm run dev                # Lokal udvikling med Turbopack
 npm run lint               # ESLint + TypeScript check
-npm test                   # Vitest: 147 tests (data-integritet + unit)
+npm test                   # Vitest: 150 tests (data-integritet + unit)
 npm run sync-theme-tag-ids # Manuel synk af WordPress tag-ID'er ind i themes/*.json
 ```
 
@@ -101,9 +101,9 @@ Disse filer genereres eksternt (ikke af denne app) og skal opdateres manuelt ell
 
 | Fil | Indhold | Struktur |
 |-----|---------|----------|
-| `All_Winning_coalitions.json` | Vindende koalitioner per udvalg + per tema | `{ TOTAL: { total_coalitions: [...] }, ITRE: [...], theme_<key>: [...], ... }` |
-| `All_Pairwise_coalitions.json` | Pairwise gruppeenighed per udvalg + per tema | `{ TOTAL: [...], ITRE: [...], theme_<key>: [...], ... }` |
-| `All_Group_wins.json` | Gruppesejre per udvalg + per tema | `{ TOTAL: { total_group_wins: [...] }, ITRE: [...], theme_<key>: [...], ... }` |
+| `All_Winning_coalitions.json` | Vindende koalitioner per udvalg; tema-antal i `theme_counts` på hver `TOTAL`-række | `{ TOTAL: { total_coalitions: [...] }, ITRE: [...], ... }` |
+| `All_Pairwise_coalitions.json` | Pairwise gruppeenighed per udvalg; tema-antal i `theme_counts` på hver `TOTAL`-række | `{ TOTAL: [...], ITRE: [...], ... }` |
+| `All_Group_wins.json` | Gruppesejre per udvalg; tema-antal i `theme_counts` på hver `TOTAL`-række | `{ TOTAL: { total_group_wins: [...] }, ITRE: [...], ... }` |
 | `latest_votes.json` | Seneste afstemninger med metadata | `{ metadata: {...}, committees: [...], eurovoc: [...], documents: [...] }` |
 | `theme_votes_forsvar_sikkerhed.json` | Afstemninger der hører til forsvars-temaet | Samme dokument-shape som `latest_votes.json` + `metadata.theme*` felter |
 | `theme_votes_energi_industri.json` | Afstemninger der hører til energi-temaet | Samme dokument-shape som `latest_votes.json` + `metadata.theme*` felter |
@@ -114,7 +114,7 @@ Disse filer genereres eksternt (ikke af denne app) og skal opdateres manuelt ell
 | `vote_details_*.json` | Detaljeret afstemningsbreakdown | Per afstemning: grupper, lande, MEP-stemmer |
 | `mep_*.json` | Individual MEP afstemningsdata | Per MEP: info + vote IDs |
 
-Nøglen `theme_<key>` (fx `theme_forsvar_sikkerhed`) er den samme på tværs af de tre `All_*` filer og matcher `metadata.theme` i den tilsvarende `theme_votes_*.json`. Se [architecture.md](architecture.md#tema-data-og-krydsreferencer) for krydsreference-diagram.
+`theme_counts` er nøglet på tema-id'et, dvs. `metadata.theme` i den tilsvarende `theme_votes_*.json` uden `theme_`-præfiks (fx `theme_forsvar_sikkerhed` → `forsvar_sikkerhed`). Se [architecture.md](architecture.md#tema-data-og-krydsreferencer) for krydsreference-diagram.
 
 ### Referencefiler
 
@@ -193,6 +193,6 @@ npm run build
 | Nye artikler fra WordPress | Ingen handling — hentes runtime næste gang en bruger åbner en tema-side |
 | Tag-navn ændret/oprettet i WordPress | Kør `npm run build` (prebuild synkroniserer `tagIds` automatisk) |
 | Nye afstemningsdata | Erstat relevante JSON-filer i `data/`, kør `npm run build` |
-| Nyt tema | Opret `data/themes/{slug}.json` + tilføj `theme_votes_<key>.json` og `theme_<key>` nøgler i de tre `All_*` filer, kør build (se [theme-admin-guide.md](theme-admin-guide.md)) |
+| Nyt tema | Opret `data/themes/{slug}.json` + tilføj `theme_votes_<key>.json` og `theme_counts`-nøglen i `TOTAL`-rækkerne i de tre `All_*` filer, kør build (se [theme-admin-guide.md](theme-admin-guide.md)) |
 | Skjul et tema | Sæt `"published": false` i temafilen, kør build |
 | Ny MEP-data | Erstat `meps_clean.json` + evt. `mep_*.json`, kør build |

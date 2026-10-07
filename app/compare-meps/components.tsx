@@ -61,7 +61,7 @@ export function MEPSelector({
         {searchTerm ? (
           filteredMeps.map(mep => (
             <option key={mep.mep_id} value={mep.mep_id}>
-              {mep.full_name} ({mep.national_party_id.name}) - {getCountryName(mep.country_code)}
+              {mep.full_name} ({mep.national_party_id?.name ?? "ukendt parti"}) - {getCountryName(mep.country_code)}
             </option>
           ))
         ) : (

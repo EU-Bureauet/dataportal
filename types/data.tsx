@@ -178,14 +178,15 @@ export interface MEPData {
   given_name: string;
   sort_label: string;
   photo_url: string;
+  // null for MEPs whose mandate has ended
   national_party_id: {
     name: string;
     code: string;
-  };
+  } | null;
   current_group_id: {
     name: string;
     code: string;
-  };
+  } | null;
   links: {
     homepage: string | null;
     ep_profile: string;
@@ -278,9 +279,9 @@ export function transformMEPData(data: MEPData[]): Politician[] {
     .map(politician => ({
       id: politician.mep_id,
       name: formatName(politician.full_name),
-      party: politician.national_party_id.name,
-      partyColor: PARTY_COLORS[politician.national_party_id.name] || "#6B7280",
-      group: politician.current_group_id.name,
+      party: politician.national_party_id?.name ?? "Ukendt parti",
+      partyColor: PARTY_COLORS[politician.national_party_id?.name ?? ""] || "#6B7280",
+      group: politician.current_group_id?.name ?? "Ukendt gruppe",
       votes: politician.n_votes,
       attendancePercentage: politician.participation_pct,
       photoUrl: politician.photo_url
@@ -450,9 +451,9 @@ export function toDetailedPolitician(mepData: MEPData): DetailedPolitician {
   return {
     id: mepData.mep_id,
     name: formatName(mepData.full_name),
-    party: mepData.national_party_id.name,
-    partyColor: PARTY_COLORS[mepData.national_party_id.name] || "#6B7280",
-    group: mepData.current_group_id.name,
+    party: mepData.national_party_id?.name ?? "Ukendt parti",
+    partyColor: PARTY_COLORS[mepData.national_party_id?.name ?? ""] || "#6B7280",
+    group: mepData.current_group_id?.name ?? "Ukendt gruppe",
     votes: mepData.n_votes,
     attendancePercentage: mepData.participation_pct,
     photoUrl: mepData.photo_url,
