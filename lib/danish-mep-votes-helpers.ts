@@ -63,6 +63,13 @@ export interface MEPSummary {
   filteredDisagreements: Disagreement[];
   topAllies: AllyCount[];
   topicVoteCount: number;
+  /**
+   * Number of votes within the active topic filter where this MEP actually
+   * has a recorded vote AND the group's majority is known — i.e. the real
+   * denominator for "brud" rates within the topic. Always 0 when there is
+   * no topic filter.
+   */
+  topicParticipatedCount: number;
 }
 
 export const GROUP_CODES = [
@@ -212,6 +219,7 @@ export function buildMepSummaries(params: {
     const mepGroupVoteMap = mepGroupCode ? groupVoteMaps[mepGroupCode] : null;
     const filtered: Disagreement[] = [];
     let totalDisagreements = 0;
+    let topicParticipatedCount = 0;
 
     if (mepGroupVoteMap && mepGroupCode) {
       const len = Math.min(mepVotesDoc.vote_ids.length, mepVotesDoc.votes.length);
@@ -231,6 +239,14 @@ export function buildMepSummaries(params: {
         let isInTopic = true;
         if (hasTopicFilter) {
           isInTopic = topicVoteIds ? topicVoteIds.has(voteId) : false;
+        }
+
+        // Count every vote within the topic where this MEP and their group
+        // both have a recorded position — this is the real denominator for
+        // "brud" rates within the topic (NOT the same as topicVoteIds.size,
+        // which also includes topic votes the MEP was absent for).
+        if (hasTopicFilter && isInTopic) {
+          topicParticipatedCount++;
         }
 
         if (!isDisagreement || !isInTopic) {
@@ -289,6 +305,7 @@ export function buildMepSummaries(params: {
       filteredDisagreements: filtered,
       topAllies,
       topicVoteCount: topicVoteIds ? topicVoteIds.size : 0,
+      topicParticipatedCount,
     };
   });
 }
