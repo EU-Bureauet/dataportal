@@ -99,53 +99,66 @@ function GroupBadge({
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function LoyaltyBar({ against, total, participationPct }: Readonly<{ against: number; total: number; participationPct?: number }>) {
-  // If we have participation data, scale the bar to include absent votes
-  const hasAbsent = participationPct !== undefined && participationPct < 100;
-  const absentPct = hasAbsent ? 100 - participationPct : 0;
-  const activePct = 100 - absentPct;
-  const loyalPct = total > 0 ? ((total - against) / total) * activePct : activePct;
-  const againstPct = total > 0 ? (against / total) * activePct : 0;
-  const loyalCount = Math.max(0, total - against);
-  const totalLabel = total.toLocaleString("da-DK");
+function LoyaltyBar({
+  against,
+  participated,
+  total,
+  absentIsExact,
+}: Readonly<{
+  /** Votes (within `participated`) where the MEP broke with their group. */
+  against: number;
+  /** Votes within scope where the MEP and their group both have a recorded position — the real denominator for the "brud" rate. */
+  participated: number;
+  /** Full size of the scope, including votes the MEP was absent for. Defaults to `participated` (no absence segment). */
+  total?: number;
+  /** Whether `total - participated` is an exact count (true, e.g. a topic filter) or an estimate derived from a global participation rate (false/omitted). */
+  absentIsExact?: boolean;
+}>) {
+  const totalEffective = total && total > participated ? total : participated;
+  const hasAbsent = totalEffective > participated;
+  const absentCount = Math.max(0, totalEffective - participated);
+  // Bar segment widths are fractions of the *whole* scope (so the three
+  // segments always sum to 100%, absence included).
+  const loyalCount = Math.max(0, participated - against);
+  const loyalBarPct = totalEffective > 0 ? (loyalCount / totalEffective) * 100 : 0;
+  const againstBarPct = totalEffective > 0 ? (against / totalEffective) * 100 : 0;
+  const absentBarPct = totalEffective > 0 ? (absentCount / totalEffective) * 100 : 0;
+  // Displayed/labelled rates are fractions of the votes the MEP actually
+  // participated in — this is what the "X af Y afstemninger" tooltip also
+  // uses, so the headline percentage and the tooltip's fraction always agree.
+  const loyalRatePct = participated > 0 ? (loyalCount / participated) * 100 : 0;
+  const againstRatePct = participated > 0 ? (against / participated) * 100 : 0;
+  const participatedLabel = participated.toLocaleString("da-DK");
   const loyalLabel = loyalCount.toLocaleString("da-DK");
   const againstLabel = against.toLocaleString("da-DK");
-  const estimatedAbsentCount =
-    hasAbsent && participationPct && participationPct > 0
-      ? Math.max(0, Math.round(total / (participationPct / 100)) - total)
-      : null;
 
   return (
     <div className="w-full">
       <div className="w-full h-4 rounded-full bg-gray-100 overflow-hidden flex">
         <div
           className="h-full bg-emerald-500 transition-all duration-500"
-          style={{ width: `${loyalPct}%` }}
-          title={`${loyalPct.toFixed(1)}% med gruppen (${loyalLabel} af ${totalLabel} afstemninger)`}
+          style={{ width: `${loyalBarPct}%` }}
+          title={`${loyalRatePct.toFixed(1)}% med gruppen (${loyalLabel} af ${participatedLabel} afstemninger)`}
         />
         <div
           className="h-full bg-red-500 transition-all duration-500"
-          style={{ width: `${againstPct}%` }}
-          title={`${againstPct.toFixed(1)}% brud (${againstLabel} af ${totalLabel} afstemninger)`}
+          style={{ width: `${againstBarPct}%` }}
+          title={`${againstRatePct.toFixed(1)}% brud (${againstLabel} af ${participatedLabel} afstemninger)`}
         />
         {hasAbsent && (
           <div
             className="h-full bg-gray-300 transition-all duration-500"
-            style={{ width: `${absentPct}%` }}
-            title={
-              estimatedAbsentCount !== null
-                ? `${absentPct.toFixed(1)}% fravær (ca. ${estimatedAbsentCount.toLocaleString("da-DK")} afstemninger)`
-                : `${absentPct.toFixed(1)}% fravær`
-            }
+            style={{ width: `${absentBarPct}%` }}
+            title={`${absentBarPct.toFixed(1)}% fravær (${absentIsExact ? "" : "ca. "}${absentCount.toLocaleString("da-DK")} afstemninger)`}
           />
         )}
       </div>
       {/* Percentages aligned to bar segments */}
       <div className="flex text-xs mt-1">
-        <span style={{ width: `${loyalPct}%` }} className="text-gray-600 truncate">{loyalPct.toFixed(1)}%</span>
-        <span style={{ width: `${againstPct}%` }} className="text-gray-600 text-center truncate">{againstPct.toFixed(1)}%</span>
+        <span style={{ width: `${loyalBarPct}%` }} className="text-gray-600 truncate">{loyalRatePct.toFixed(1)}%</span>
+        <span style={{ width: `${againstBarPct}%` }} className="text-gray-600 text-center truncate">{againstRatePct.toFixed(1)}%</span>
         {hasAbsent && (
-          <span style={{ minWidth: '2.5rem' }} className="text-gray-400 text-right flex-shrink-0">{absentPct.toFixed(1)}%</span>
+          <span style={{ minWidth: '2.5rem' }} className="text-gray-400 text-right flex-shrink-0">{absentBarPct.toFixed(1)}%</span>
         )}
       </div>
       {/* Color legend */}
@@ -575,43 +588,50 @@ export function DanishMEPVotesChart() {
                     {/* Loyalty bar */}
                     <div className="mt-3">
                       {(() => {
-                        const participationPct = s.mep.participation_pct;
-                        const hasAbsent = participationPct !== undefined && participationPct < 100;
-                        const absentPct = hasAbsent ? 100 - participationPct : 0;
-                        const activePct = 100 - absentPct;
+                        let barAgainst: number;
+                        let barParticipated: number;
+                        let barTotal: number;
+                        let absentIsExact: boolean;
 
-                        let barTotal: number, barAgainst: number;
                         if (hasTopicFilter) {
-                          barTotal = s.topicVoteCount;
+                          // Exact counts: how many of the topic's votes this
+                          // MEP actually took part in, vs. the topic's full size.
                           barAgainst = filteredCount;
+                          barParticipated = s.topicParticipatedCount;
+                          barTotal = s.topicVoteCount;
+                          absentIsExact = true;
                         } else {
-                          barTotal = s.mep.n_votes;
+                          // n_votes is already "votes this MEP participated in
+                          // with a known group majority"; the full scope (incl.
+                          // absences) is estimated from the overall participation rate.
+                          const participationPct = s.mep.participation_pct;
                           barAgainst = s.mep.n_votes_against_group;
+                          barParticipated = s.mep.n_votes;
+                          barTotal =
+                            participationPct && participationPct > 0
+                              ? Math.round(barParticipated / (participationPct / 100))
+                              : barParticipated;
+                          absentIsExact = false;
                         }
 
-                        const loyalPct = barTotal > 0 ? ((barTotal - barAgainst) / barTotal) * activePct : activePct;
-                        const againstPct = barTotal > 0 ? (barAgainst / barTotal) * activePct : 0;
+                        const totalEffective = barTotal > barParticipated ? barTotal : barParticipated;
+                        const loyalCount = Math.max(0, barParticipated - barAgainst);
+                        const loyalBarPct = totalEffective > 0 ? (loyalCount / totalEffective) * 100 : 0;
+                        const againstBarPct = totalEffective > 0 ? (barAgainst / totalEffective) * 100 : 0;
                         // Center of the red segment
-                        const arrowLeft = loyalPct + againstPct / 2;
+                        const arrowLeft = loyalBarPct + againstBarPct / 2;
 
                         return (
                           <>
-                            {hasTopicFilter ? (
-                              <LoyaltyBar
-                                against={filteredCount}
-                                total={s.topicVoteCount}
-                                participationPct={participationPct}
-                              />
-                            ) : (
-                              <LoyaltyBar
-                                against={s.mep.n_votes_against_group}
-                                total={s.mep.n_votes}
-                                participationPct={participationPct}
-                              />
-                            )}
+                            <LoyaltyBar
+                              against={barAgainst}
+                              participated={barParticipated}
+                              total={barTotal}
+                              absentIsExact={absentIsExact}
+                            />
 
                             {/* Red connector arrow aligned with brud segment */}
-                            {isExpanded && againstPct > 0 && (
+                            {isExpanded && againstBarPct > 0 && (
                               <div className="relative h-4 -mb-2">
                                 <svg
                                   width="20"
