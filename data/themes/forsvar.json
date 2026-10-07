@@ -1,0 +1,48 @@
+{
+  "slug": "forsvar",
+  "title": "Forsvar og sikkerhed",
+  "subtitle": "",
+  "heroImage": "/img/theme/forsvar/forsvar_hero.jpg",
+  "videoUrl": "/data/videos/Rasmus_forsvar og sikkerhed_V2_endelig.mp4",
+  "articleFilter": {
+    "tags": ["Forsvar- og sikkerhedstema"],
+    "tagIds": [105],
+    "maxArticles": 100
+  },
+  "published": true,
+  "visualisations": [
+    {
+      "title": "Afstemninger",
+      "description": "Se de seneste afstemninger om forsvar og sikkerhed i Europa-Parlamentet.",
+      "href": "/latest-votes?search=forsvar&eurovoc=forsvarspolitik",
+      "ctaText": "Seneste afstemninger",
+      "dataSource": {
+        "file": "latest_votes.json",
+        "search": "forsvar",
+        "eurovoc": "forsvarspolitik"
+      }
+    },
+    {
+      "title": "Heatmap",
+      "description": "Se hvilke politiske grupper der oftest stemmer sammen om forsvar og sikkerhed.",
+      "href": "/heatmap?theme=theme_forsvar_sikkerhed",
+      "ctaText": "Se heatmap",
+      "dataSource": {
+        "file": "All_Pairwise_coalitions.json",
+        "theme": "theme_forsvar_sikkerhed"
+      }
+    },
+    {
+      "title": "Danske MEP'er",
+      "description": "Hvornår bryder danske MEP'er med deres partigruppe om forsvar og sikkerhed – og hvem stemmer de med i stedet?",
+      "href": "/danish-mep-votes?search=forsvar&eurovoc=forsvarspolitik",
+      "ctaText": "Se danske MEP'er"
+    },
+    {
+      "title": "Koalitioner",
+      "description": "Se hvem står bag vedtagelserne om forsvar og sikkerhed.",
+      "href": "/theme-winning-coalitions?committee=SEDE&theme=forsvar",
+      "ctaText": "Se koalitioner"
+    }
+  ]
+}

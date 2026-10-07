@@ -1,0 +1,47 @@
+{
+  "slug": "miljoe",
+  "title": "Miljø og sundhed",
+  "subtitle": "",
+  "heroImage": "/img/theme/miljoe/miljoe_hero.jpg",
+  "articleFilter": {
+    "tags": ["Miljø- og sundhedstema"],
+    "tagIds": [106],
+    "maxArticles": 100
+  },
+  "published": false,
+  "visualisations": [
+    {
+      "title": "Afstemninger",
+      "description": "Se de seneste afstemninger om miljø og sundhed i Europa-Parlamentet.",
+      "href": "/latest-votes?search=miljø&eurovoc=miljøpolitik",
+      "ctaText": "Seneste afstemninger",
+      "dataSource": {
+        "file": "latest_votes.json",
+        "search": "miljø",
+        "eurovoc": "miljøpolitik"
+      }
+    },
+    {
+      "title": "Heatmap",
+      "description": "Se hvilke politiske grupper der oftest stemmer sammen om miljø og sundhed.",
+      "href": "/heatmap?theme=theme_miljo_sundhed",
+      "ctaText": "Se heatmap",
+      "dataSource": {
+        "file": "All_Pairwise_coalitions.json",
+        "theme": "theme_miljo_sundhed"
+      }
+    },
+    {
+      "title": "Danske MEP'er",
+      "description": "Hvornår bryder danske MEP'er med deres partigruppe om miljø og sundhed – og hvem stemmer de med i stedet?",
+      "href": "/danish-mep-votes?search=miljø&eurovoc=miljøpolitik",
+      "ctaText": "Se danske MEP'er"
+    },
+    {
+      "title": "Koalitioner",
+      "description": "Se hvem står bag vedtagelserne om miljø og sundhed.",
+      "href": "/theme-winning-coalitions?committee=ENVI&theme=miljoe",
+      "ctaText": "Se koalitioner"
+    }
+  ]
+}

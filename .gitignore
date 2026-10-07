@@ -15,7 +15,8 @@ node_modules/
 .vscode/
 
 public/data/
-data/
+data/*
+!data/themes/
 
 # MacOS
 .DS_Store
