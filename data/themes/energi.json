@@ -8,7 +8,7 @@
     "tagIds": [110],
     "maxArticles": 100
   },
-  "published": false,
+  "published": true,
   "visualisations": [
     {
       "title": "Afstemninger",
